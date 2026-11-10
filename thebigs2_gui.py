@@ -407,7 +407,7 @@ GROUPS = [
     ]),
     ("Frame rate", [
         {"key": "frame_rate", "label": "Match frame rate", "type": "int",
-         "default": 30, "options": ["30", "60"],
+         "default": 30, "options": ["30", "60"], "requires": lambda v: v.get("_online_mode") == "Offline",
          "help": "30 = the game's own cap. 60 is experimental; use with render "
                  "scale 1 and a fast machine."},
     ]),
@@ -480,7 +480,8 @@ INFO = {
                       "(default). cas: a little sharper. fsr: AMD FSR 1 upscaling, sharper "
                       "edges when the render is smaller than the screen.",
     "frame_rate": "30 is the game's own. 60 is experimental: it needs a fast CPU and GPU "
-                  "(1x on the desktop); go back to 30 if it stutters.",
+                  "(1x on the desktop); go back to 30 if it stutters. Offline only: online "
+                  "matches always run at 30, so both players stay in step.",
     "mnk_mode": "The keyboard plays as player 1's controller, together with the first pad.",
     "bind_quit": "Key that quits the game (controller: hold Back + Start for 2 seconds).",
     "bind_settings_menu": "Key that opens this menu (controller: hold Back + Y for a second).",
@@ -1023,7 +1024,7 @@ class Launcher(tk.Tk):
             for i, f in enumerate(fields):
                 row = self._add_field(body, row, f, first=(i == 0))
         # Re-evaluate which settings apply whenever a value changes.
-        for var in self.vars.values():
+        for var in [*self.vars.values(), self.online_mode]:
             var.trace_add("write", lambda *_: self._update_gates())
         self.after_idle(self._update_gates)
 
@@ -1336,6 +1337,7 @@ class Launcher(tk.Tk):
     def _update_gates(self):
         try:
             values = {k: v.get() for k, v in self.vars.items()}
+            values["_online_mode"] = self.online_mode.get() if hasattr(self, "online_mode") else "Offline"
             for f in ALL_FIELDS:
                 req = f.get("requires")
                 self._set_field_enabled(

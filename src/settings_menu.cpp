@@ -119,7 +119,7 @@ std::vector<Item> Items() {
        "\"bilinear\"", true},
       {"frame_rate", "Graphics", "Frame rate in matches",
        "30 is the game's own. 60 is experimental: it needs a fast CPU and GPU (1x on the "
-       "desktop); go back to 30 if it stutters.",
+       "desktop); go back to 30 if it stutters. Online matches always run at 30.",
        Kind::kChoice, {{"30", "30 fps"}, {"60", "60 fps (experimental)"}}, "30", true},
       {"mnk_mode", "Controls", "Keyboard as player 1",
        "The keyboard plays as player 1's controller, together with the first pad.",

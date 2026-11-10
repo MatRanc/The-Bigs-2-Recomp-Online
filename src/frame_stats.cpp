@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
 #include <cmath>
 #include <mutex>
 #include <thread>
@@ -220,7 +221,9 @@ extern "C" REX_FUNC(sub_823B9CB8) {
   if (last_interval.exchange(interval, std::memory_order_relaxed) != interval) {
     REXLOG_INFO("[fps] game present interval {} (arg {:08X})", interval, arg);
   }
-  if (interval > 1 && (REXCVAR_GET(frame_rate) >= 60 || REXCVAR_GET(fps_60))) {
+  // Online (lockstep) always runs the game's own 30: the sim steps by real time, so 60 is untested there.
+  static const bool online = std::getenv("TB2_FAKE_LIVE") != nullptr;
+  if (interval > 1 && !online && (REXCVAR_GET(frame_rate) >= 60 || REXCVAR_GET(fps_60))) {
     ctx.r3.u64 = (arg & ~0xF00u) | (1u << 8);
   }
   [[clang::musttail]] return __imp__sub_823B9CB8(ctx, base);

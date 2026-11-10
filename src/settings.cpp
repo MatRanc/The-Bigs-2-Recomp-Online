@@ -124,6 +124,7 @@ anisotropic_override = 3
 #          short (about 53 fps on an RTX 4060), which looks worse than 30;
 #        - Steam Deck: holds 60 in gameplay, slows down during transitions.
 #        If it stutters, go back to 30.
+#   Online matches always run at 30 (both players stay in step).
 frame_rate = 30
 
 # --- Controls ----------------------------------------------------------------
@@ -279,6 +280,7 @@ constexpr const char* kFrameRateSection = R"TOML(
 #          short (about 53 fps on an RTX 4060), which looks worse than 30;
 #        - Steam Deck: holds 60 in gameplay, slows down during transitions.
 #        If it stutters, go back to 30.
+#   Online matches always run at 30 (both players stay in step).
 frame_rate = 30
 )TOML";
 
