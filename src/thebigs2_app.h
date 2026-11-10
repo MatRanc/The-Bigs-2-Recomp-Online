@@ -146,7 +146,9 @@ class Thebigs2App : public rex::ReXApp {
       rex::ui::RegisterBind("bind_online_live", "F6", "Nudge Live connection",
                             [] { tb2::NudgeLiveConnection(); });
     }
+#if !defined(__APPLE__)
     TB2_RegisterRenderDocCaptureBind();
+#endif
     TB2_LogRenderTargetPath();
     SetGuestFrameStats(&tb2::GuestFrameStats);
 #if defined(TB2_RENDER_TRACE)

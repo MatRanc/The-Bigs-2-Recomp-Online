@@ -25,7 +25,6 @@ endif()
 set(THEBIGS2_SOURCES
     src/main.cpp
     src/hooks.cpp
-    src/renderdoc_capture.cpp
     src/settings.cpp
     src/main_menu_entry.cpp
     src/online_debug.cpp
@@ -36,6 +35,11 @@ set(THEBIGS2_SOURCES
     src/first_launch.cpp
     src/render_tweaks.cpp
 )
+
+# RenderDoc (F8 frame capture) has no macOS build; its header stops with "Unknown platform".
+if(NOT APPLE)
+    list(APPEND THEBIGS2_SOURCES src/renderdoc_capture.cpp)
+endif()
 
 if(WIN32)
     add_executable(thebigs2 WIN32 ${THEBIGS2_SOURCES} packaging/windows/thebigs2.rc)
