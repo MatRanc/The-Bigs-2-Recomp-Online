@@ -58,7 +58,8 @@ THEME_ICONS = {"system": "🌗", "light": "☀️", "dark": "🌙"}
 def _try_run(cmd):
     """Run a short probe, returning stdout or "" on any failure."""
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=2,
+                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         return (result.stdout or "").strip()
     except Exception:
         return ""
@@ -175,6 +176,23 @@ def online_env(mode, name, peer_ip=""):
     return env
 
 
+def game_env():
+    """os.environ without the frozen launcher's own library path, which the game must not inherit
+    (on Windows it would load the launcher's bundled DLLs, e.g. vcruntime140)."""
+    env = dict(os.environ)
+    if FROZEN:
+        if os.name == "nt":
+            import ctypes
+            ctypes.windll.kernel32.SetDllDirectoryW(None)
+        for k in ("LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"):
+            orig = env.pop(k + "_ORIG", None)
+            if orig is None:
+                env.pop(k, None)
+            else:
+                env[k] = orig
+    return env
+
+
 def check_name(name):
     """Error message for an unusable player name, or None."""
     if not name:
@@ -197,31 +215,14 @@ def resolve_peer(addr):
         raise ValueError(f"Cannot find '{addr}'. Check the address (for Tailscale, the 100.x.y.z IP).")
 
 
-def local_ips():
-    """This machine's IPv4 addresses, Tailscale (100.x) first, without loopback."""
-    ips = []
-    try:  # the address used for outgoing traffic (UDP connect sends nothing)
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.connect(("192.0.2.1", 9))
-            ips.append(s.getsockname()[0])
-    except OSError:
-        pass
+def _route_ip(dest):
+    """The local address the OS would use to reach dest (a UDP connect sends no packet), or None."""
     try:
-        ips += [i[4][0] for i in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)]
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect((dest, 9))
+            return sock.getsockname()[0]
     except OSError:
-        pass
-    ips += _try_run(["tailscale", "ip", "-4"]).split()
-    if sys.platform == "darwin":  # the Mac app's CLI is not on PATH by default
-        ips += _try_run(["/Applications/Tailscale.app/Contents/MacOS/Tailscale", "ip", "-4"]).split()
-    elif os.name == "nt":
-        exe = os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "Tailscale", "tailscale.exe")
-        if os.path.isfile(exe):
-            ips += _try_run([exe, "ip", "-4"]).split()
-    seen = []
-    for ip in ips:
-        if ip and not ip.startswith("127.") and ip not in seen:
-            seen.append(ip)
-    return sorted(seen, key=lambda ip: not ip.startswith("100."))
+        return None
 
 GUIDE_URL = "https://github.com/MatRanc/The-Bigs-2-Recomp-Online/blob/HEAD/docs/PLAY_ONLINE.md"
 TAILSCALE_GUIDE_URL = GUIDE_URL + "#set-up-tailscale"
@@ -239,16 +240,24 @@ def is_tailscale_ip(ip):
 
 
 def tailscale_ip():
-    """This machine's Tailscale address, or None when Tailscale isn't running here."""
-    return next((ip for ip in local_ips() if is_tailscale_ip(ip)), None)
+    """This PC's Tailscale address, or None when Tailscale isn't connected. Asks the OS which address reaches
+    Tailscale's DNS address instead of running the CLI (which flashes a console on Windows, opens the app on macOS,
+    and can stall). An address equal to the normal route's is a carrier's 100.x network, not Tailscale."""
+    ip = _route_ip("100.100.100.100")
+    return ip if ip and is_tailscale_ip(ip) and ip != _route_ip("192.0.2.1") else None
 
 
 def lan_ip():
-    """This machine's address on the home network (192.168.x.y and the like), or None."""
+    """This PC's address on the home network (192.168.x.y and the like), or None."""
     def private(ip):
         a, b = (int(x) for x in ip.split(".")[:2])
         return a == 10 or (a == 172 and 16 <= b <= 31) or (a == 192 and b == 168)
-    return next((ip for ip in local_ips() if private(ip)), None)
+    ips = [_route_ip("192.0.2.1")]
+    try:
+        ips += [i[4][0] for i in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)]
+    except OSError:
+        pass
+    return next((ip for ip in ips if ip and private(ip)), None)
 
 
 def public_ip():
@@ -1016,10 +1025,10 @@ class Launcher(tk.Tk):
             body.columnconfigure(1, weight=1)
             row = 0
             if name == "Scaling":
-                ttk.Label(body, text="Game running slow? Lower Render scale first (the biggest effect), "
+                self._scale_tip = ttk.Label(body, text="Game running slow? Lower Render scale first (the biggest effect), "
                           "then set Scene MSAA to Off. Hover ⓘ for what each setting does.",
-                          style="Hint.TLabel", wraplength=560, justify="left").grid(
-                    row=0, column=0, columnspan=2, sticky="w", pady=(0, 14))
+                          style="Hint.TLabel", wraplength=560, justify="left")
+                self._scale_tip.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 14))
                 row = 1
             for i, f in enumerate(fields):
                 row = self._add_field(body, row, f, first=(i == 0))
@@ -1146,6 +1155,14 @@ class Launcher(tk.Tk):
         self.online_net.trace_add("write", gate)
         self._online_gate = gate
         gate()
+
+        def watch(last=None):
+            # cheap (no CLI), so Tailscale started or a network change shows up without clicking anything
+            now = (tailscale_ip(), lan_ip())
+            if last is not None and now != last and self.online_mode.get() != "Offline":
+                gate()
+            self.after(2000, lambda: watch(now))
+        watch()
 
     def _online_hint(self, mode, net, ts):
         if mode == "Offline":
@@ -1356,8 +1373,9 @@ class Launcher(tk.Tk):
         try:
             for w in getattr(self, "_links", ()):
                 w.configure(foreground=palette[1])
-            if hasattr(self, "_hint"):
-                self._hint.configure(foreground=palette[0])
+            for name in ("_hint", "_scale_tip"):
+                if hasattr(self, name):
+                    getattr(self, name).configure(foreground=palette[0])
         except tk.TclError:
             pass
 
@@ -1603,7 +1621,7 @@ class Launcher(tk.Tk):
                 parent=self)
             return
         try:
-            self.proc = subprocess.Popen([launcher], cwd=ROOT, env={**os.environ, **extra_env})
+            self.proc = subprocess.Popen([launcher], cwd=ROOT, env={**game_env(), **extra_env})
         except Exception as e:
             self._report_error("Cannot launch the game", e)
             return
@@ -1651,6 +1669,12 @@ def main():
             _show_already_running()
             return
     try:
+        if os.name == "nt":
+            try:  # draw at the screen's real resolution instead of being stretched (blurry) by display scaling
+                import ctypes
+                ctypes.windll.shcore.SetProcessDpiAwareness(1)
+            except (AttributeError, OSError):
+                pass
         app = Launcher()
     except Exception as e:
         # Tk itself failed (no display, broken theme, ...): explain on stderr
