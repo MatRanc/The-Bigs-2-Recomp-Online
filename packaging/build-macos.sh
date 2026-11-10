@@ -20,6 +20,15 @@ case "$(uname -m)" in
   *) echo "Unsupported Mac CPU: $(uname -m)" >&2; exit 1 ;;
 esac
 
+# Parallel compile jobs. The game's ~80 generated C++ files need ~3-4 GB of RAM each to compile, so one job per core
+# can eat 60 GB+ and swap the Mac to a crawl: allow one job per 4 GB of RAM (override with JOBS=n).
+RAM_GB=$(( $(sysctl -n hw.memsize) / 1073741824 ))
+CORES=$(sysctl -n hw.ncpu)
+JOBS="${JOBS:-$(( RAM_GB / 4 ))}"
+[ "$JOBS" -lt 1 ] && JOBS=1
+[ "$JOBS" -gt "$CORES" ] && JOBS=$CORES
+echo "Building with $JOBS parallel jobs ($RAM_GB GB RAM, $CORES cores)"
+
 xcrun --version >/dev/null 2>&1 || { echo "Install the Xcode command line tools: xcode-select --install" >&2; exit 1; }
 for t in cmake ninja git; do
   command -v $t >/dev/null || { echo "Missing $t. With Homebrew: brew install cmake ninja git" >&2; exit 1; }
@@ -33,14 +42,14 @@ else
   git -C "$SDK_SRC" pull --ff-only && git -C "$SDK_SRC" submodule update --init --recursive
 fi
 cmake -S "$SDK_SRC" --preset "$PRESET"
-cmake --build "$SDK_SRC/out/build/$PRESET" --config Release
+cmake --build "$SDK_SRC/out/build/$PRESET" --config Release -j "$JOBS"
 cmake --install "$SDK_SRC/out/build/$PRESET" --config Release --prefix "$SDK_INSTALL"
 
 # 2. The game (the recompiler runs as part of the build).
 BUILD="$ROOT/out/build/mac-release"
 cmake -S "$ROOT" -B "$BUILD" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$SDK_INSTALL" \
   -DCMAKE_OSX_ARCHITECTURES="$(uname -m)"
-cmake --build "$BUILD"
+cmake --build "$BUILD" -j "$JOBS"
 
 # 3. Release zip: the game folder (exe, dylibs, Vulkan/MoltenVK) + the launcher. No game data.
 NAME="TheBigs2-macos-$(uname -m)"
