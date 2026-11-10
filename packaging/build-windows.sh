@@ -78,12 +78,10 @@ for f in "$STAGE"/*.exe "$STAGE"/*.dll; do
   done
 done
 
-# The launcher (Settings + Online tabs). Runs with Python 3 via the .bat; build-launcher-exe.bat makes an exe.
-cp "$ROOT/thebigs2_gui.py" "$ROOT/packaging/windows/The Bigs 2 Launcher.bat" \
-   "$ROOT/packaging/windows/build-launcher-exe.bat" "$STAGE/"
-mkdir -p "$STAGE/vendor" "$STAGE/assets"
-cp -r "$ROOT/vendor/sv_ttk" "$STAGE/vendor/" && rm -rf "$STAGE/vendor/sv_ttk/__pycache__"
-cp -r "$ROOT/assets/theme-icons" "$ROOT/assets/bigs2-logo-128.png" "$ROOT/assets/bigs2-logo.png" "$STAGE/assets/"
+# The launcher (Settings + Online tabs) as a stand-alone exe, from packaging/fetch-launcher.sh.
+LAUNCHER="$ROOT/out/launcher/launcher-windows/The Bigs 2 Launcher.exe"
+[ -f "$LAUNCHER" ] || { echo "No launcher at $LAUNCHER: run packaging/fetch-launcher.sh first." >&2; exit 1; }
+cp "$LAUNCHER" "$STAGE/"
 
 rm -f "$OUT_DIR/$NAME.zip"
 (cd "$OUT_DIR" && zip -qr9 "$NAME.zip" "$NAME")

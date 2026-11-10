@@ -10,6 +10,8 @@ brings back the game's **online mode**: the original peer-to-peer netcode,
 with a small stand-in for the Xbox Live service that shut down. Two players meet
 in the Game Room, pick their teams and play a full match, in sync.
 
+![Two copies of the game in one online match: the host (left) and the joiner (right) at the same pitch, same count](docs/images/online-match.jpg)
+
 > **Clean room.** This repo contains no game code, game files or 2K data: no
 > executable (`default.xex`), no disc contents, no recompiled output, no
 > captures or memory dumps. It holds the port's own code and describes how the
@@ -31,14 +33,13 @@ in the Game Room, pick their teams and play a full match, in sync.
    | macOS | `TheBigs2-macos-arm64.zip` *(experimental, when available)* |
 
 2. Unpack it into a folder of its own and put your `.iso` next to it.
-3. Start **The Bigs 2 Launcher**:
-   - **Windows:** double-click `The Bigs 2 Launcher.bat`. It needs
-     [Python 3](https://www.python.org/downloads/) (the default install is fine).
-   - **Linux:** run `./thebigs2_gui.py` (needs Python 3 with Tk, e.g. the
-     `python3-tk` package).
-   - **macOS:** run `python3 thebigs2_gui.py` in the folder. The first time,
-     allow the unsigned game with `xattr -dr com.apple.quarantine .` in that
-     folder.
+3. Start **The Bigs 2 Launcher** in that folder. Nothing else to install.
+   - **Windows:** `The Bigs 2 Launcher.exe`. Windows may warn about an
+     unrecognised app the first time: *More info* > *Run anyway*.
+   - **Linux:** `The Bigs 2 Launcher` (double-click, or run it from a terminal).
+   - **macOS:** `The Bigs 2 Launcher.app`. The app isn't signed, so the first
+     time right-click it > *Open*, or run `xattr -dr com.apple.quarantine .` in
+     the folder.
 4. Press **Launch Game**. The first start asks for your disc image (an `.iso`
    next to the game is preselected), copies its files once, and the game starts.
 
@@ -48,6 +49,8 @@ You can also start the game directly (`thebigs2.exe`, the AppImage, or
 ## Play online with a friend
 
 Both players need this build and their own copy of the game.
+
+![The launcher's Online tab: Host a game or Join a friend, player name, the host's IP and your own IPs](docs/images/launcher-online.png)
 
 1. **Get on the same network.** The easiest way is [Tailscale](https://tailscale.com)
    (free): both install it and join the same tailnet (the host can share their
@@ -63,6 +66,10 @@ Both players need this build and their own copy of the game.
 5. Both press **A (Ready)**. In Team Setup move your controller to a side with
    the d-pad, pick your team and uniform, then the pitcher and lineup. The host
    picks the stadium, and the match starts.
+
+![The Game Room on both machines: User1 and User2 in the player slots](docs/images/online-gameroom.jpg)
+
+![Game Setup: only the host can pick the stadium; the joiner sees the same screen](docs/images/online-gamesetup.jpg)
 
 **Good to know**
 - Player names: up to 8 characters, and the two players need different names.
@@ -196,6 +203,10 @@ down in transitions. The first minutes can stutter while shaders compile.
 
 - **[docs/BUILDING.md](docs/BUILDING.md)**: build the SDK and the game, package
   the releases (Linux, Windows cross-build, macOS).
+- **Where the downloads come from:** the launcher apps are built by GitHub
+  Actions from this repo ([workflow](.github/workflows/build-launcher.yml));
+  the game builds can't be (they need game files that are never uploaded), so
+  they're built with the scripts in `packaging/` and attached to the release.
 - **[docs/ONLINE.md](docs/ONLINE.md)**: how the online mode works, the debug
   flags, and how to test two copies on one PC.
 - The online build needs the SDK fork

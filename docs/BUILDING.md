@@ -101,16 +101,21 @@ Logs are in `out/build/linux-amd64-release/logs/`.
 ## 4. Packaging
 
 The release files are one archive per system, each with the game and the
-launcher (`thebigs2_gui.py`) and no game data:
+stand-alone launcher (Python and Tk bundled, nothing to install) and no game
+data. The launcher apps are built by GitHub Actions
+(`.github/workflows/build-launcher.yml`, run it from the Actions tab or push a
+`v*` tag); the game can't be built there, since that needs game files.
 
 ```bash
+packaging/fetch-launcher.sh  # download the launcher apps into out/launcher/ (gh CLI)
 packaging/build-linux.sh     # out/linux/TheBigs2-linux-x64.tar.gz (both AppImages + launcher)
 packaging/build-windows.sh   # out/windows/TheBigs2-windows-x64.zip
 packaging/build-macos.sh     # on a Mac: out/macos/TheBigs2-macos-<arch>.zip
+packaging/release.sh <tag>   # all of the above for Linux + Windows, uploaded to the release
 ```
 
 Configure the Linux build without `-DTB2_FN_TRACE=ON` (a debug option) before
-packaging. To publish, attach the three files to a GitHub release.
+packaging. Upload the macOS zip with `gh release upload <tag> <zip> --clobber`.
 
 ### Linux AppImage
 

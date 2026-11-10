@@ -45,15 +45,18 @@ cmake --build "$BUILD"
 # 3. Release zip: the game folder (exe, dylibs, Vulkan/MoltenVK) + the launcher. No game data.
 NAME="TheBigs2-macos-$(uname -m)"
 STAGE="$ROOT/out/macos/$NAME"
-rm -rf "$STAGE" && mkdir -p "$STAGE/vendor" "$STAGE/assets"
+rm -rf "$STAGE" && mkdir -p "$STAGE"
 cp "$BUILD/thebigs2" "$BUILD"/*.dylib "$STAGE/"
 [ -d "$BUILD/vulkan" ] && cp -R "$BUILD/vulkan" "$STAGE/"
 [ -f "$BUILD/gamecontrollerdb.txt" ] && cp "$BUILD/gamecontrollerdb.txt" "$STAGE/"
-cp "$ROOT/thebigs2_gui.py" "$STAGE/"
-cp -R "$ROOT/vendor/sv_ttk" "$STAGE/vendor/" && rm -rf "$STAGE/vendor/sv_ttk/__pycache__"
-cp -R "$ROOT/assets/theme-icons" "$ROOT/assets/bigs2-logo-128.png" "$ROOT/assets/bigs2-logo.png" "$STAGE/assets/"
+# The stand-alone launcher app (GitHub Actions build): out/launcher/launcher-macos/, from fetch-launcher.sh (needs
+# the gh CLI) or copied over from another machine.
+LAUNCHER_ZIP="${LAUNCHER_ZIP:-$ROOT/out/launcher/launcher-macos/The Bigs 2 Launcher.app.zip}"
+if [ ! -f "$LAUNCHER_ZIP" ] && command -v gh >/dev/null; then "$ROOT/packaging/fetch-launcher.sh" || true; fi
+[ -f "$LAUNCHER_ZIP" ] || { echo "No launcher at $LAUNCHER_ZIP: run packaging/fetch-launcher.sh (gh CLI) first." >&2; exit 1; }
+ditto -x -k "$LAUNCHER_ZIP" "$STAGE"
 (cd "$ROOT/out/macos" && rm -f "$NAME.zip" && zip -qry "$NAME.zip" "$NAME")
 
 echo
 echo "Built $BUILD/thebigs2 and $ROOT/out/macos/$NAME.zip"
-echo "Start the launcher with: python3 $ROOT/thebigs2_gui.py"
+echo "Start the launcher with: python3 $ROOT/thebigs2_gui.py (dev) or open the .app in the zip"
