@@ -1,0 +1,53 @@
+name: Build launcher
+
+# Builds "The Bigs 2 Launcher" as a stand-alone app (Python and Tk inside, nothing to install) for Windows, macOS and
+# Linux. The game itself can't be built here (that needs your own game files), so packaging/release.sh downloads
+# these artifacts and puts each next to the game build for its system.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: launcher-windows
+          - os: macos-latest
+            artifact: launcher-macos
+          - os: ubuntu-22.04  # older glibc, so the binary runs on more distros
+            artifact: launcher-linux
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: pip install pyinstaller==6.22.3 pillow  # pillow: turns the PNG icon into .ico / .icns
+      - name: PyInstaller
+        run: >
+          pyinstaller --noconfirm --clean --onefile --windowed --name "The Bigs 2 Launcher"
+          --icon assets/bigs2-logo.png
+          --add-data "vendor/sv_ttk:vendor/sv_ttk"
+          --add-data "assets/theme-icons:assets/theme-icons"
+          --add-data "assets/bigs2-logo.png:assets"
+          --add-data "assets/bigs2-logo-128.png:assets"
+          thebigs2_gui.py
+      - name: Check
+        if: runner.os == 'Linux'
+        run: python thebigs2_gui.py --online-env Host Test
+      - name: Package (macOS app as zip, keeps the bundle intact)
+        if: runner.os == 'macOS'
+        run: cd dist && ditto -c -k --keepParent "The Bigs 2 Launcher.app" "The Bigs 2 Launcher.app.zip" && rm -rf "The Bigs 2 Launcher.app" "The Bigs 2 Launcher"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/

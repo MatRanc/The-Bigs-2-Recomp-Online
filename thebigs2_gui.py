@@ -18,14 +18,22 @@ import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import filedialog, messagebox, ttk
 
-# A PyInstaller exe runs from a temp folder; its files (game, config) sit next to the exe.
-ROOT = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, "frozen", False) else __file__))
+# ROOT is the game folder (game, config/, saves/). The release launcher is a PyInstaller app that sits in that
+# folder (on macOS the folder holding "The Bigs 2 Launcher.app"); its own files (theme, icons) are in RES.
+FROZEN = getattr(sys, "frozen", False)
+if FROZEN:
+    _exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+    _app = _exe_dir.split(".app" + os.sep)[0] + ".app" if ".app" + os.sep in _exe_dir + os.sep else None
+    ROOT = os.path.dirname(_app) if _app else _exe_dir
+    RES = getattr(sys, "_MEIPASS", ROOT)
+else:
+    ROOT = RES = os.path.dirname(os.path.abspath(__file__))
 CONFIG = os.path.join(ROOT, "config", "thebigs2.toml")
 
 # A vendored copy of the sv-ttk (Sun Valley) theme: the modern dark look used
 # by the mlb16-online launcher, with no pip install needed. MIT licensed, see
 # vendor/sv_ttk/LICENSE.
-sys.path.insert(0, os.path.join(ROOT, "vendor"))
+sys.path.insert(0, os.path.join(RES, "vendor"))
 try:
     import sv_ttk
 except Exception:  # pragma: no cover - only if the vendor folder is missing
@@ -39,7 +47,7 @@ GUI_LOG = os.path.join(ROOT, "config", "gui.log")
 THEME_ORDER = ("system", "light", "dark")
 # Colour emoji icons (rendered from the system's Noto Color Emoji) for the
 # header toggle; the text glyphs are only a fallback if the PNGs are missing.
-THEME_ICON_DIR = os.path.join(ROOT, "assets", "theme-icons")
+THEME_ICON_DIR = os.path.join(RES, "assets", "theme-icons")
 THEME_ICONS = {"system": "🌗", "light": "☀️", "dark": "🌙"}
 
 
@@ -707,7 +715,7 @@ class Launcher(tk.Tk):
     def _set_window_icon(self):
         for name in ("bigs2-logo-128.png", "bigs2-logo.png",
                      "thebigs2-window.png", "thebigs2.png"):
-            path = os.path.join(ROOT, "assets", name)
+            path = os.path.join(RES, "assets", name)
             try:
                 if os.path.isfile(path):
                     self._window_icon = tk.PhotoImage(file=path)
