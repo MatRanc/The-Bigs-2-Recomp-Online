@@ -10,8 +10,8 @@ and play a full match, in sync.
 
 ![An online match on two PCs: the host (left) and the joiner (right) at the same pitch, same count](docs/images/online-match.jpg)
 
-> **You need your own copy of the game** (a disc image, `.iso`). This repo
-> contains no game code or game files; see [Legal](#legal).
+> **You need your own copy of the game** (a disc image, `.iso`). Neither this
+> repo nor its releases contain game assets; see [Legal](#legal).
 
 ## Download and install
 
@@ -225,11 +225,17 @@ down in transitions. The first minutes can stutter while shaders compile.
 
 ## Legal
 
-This repo contains no game code, game files or 2K data: no executable
+**The source code** in this repo contains nothing from the game: no executable
 (`default.xex`), no disc contents, no recompiled output, no captures or memory
 dumps. It holds the port's own code and describes how the game's online mode
-talks to the other player, so people can keep playing a game they own. You need
-your own copy of the game. *The Bigs 2* is © 2K Sports / Take-Two Interactive;
+talks to the other player, so people can keep playing a game they own.
+
+**The releases** contain the game's program translated to run natively on PC
+(that is what a static recompilation is; building one needs the original
+executable), but **no game assets**: graphics, audio, stadiums and rosters come
+from your own disc image when you first start the game. As with other
+recompilation projects, the original game is required to build or run this
+project. *The Bigs 2* is © 2K Sports / Take-Two Interactive;
 MLB marks are the property of Major League Baseball. The logo used for the
 icons is a trademark of its owners. Not affiliated with 2K, Take-Two or MLB.
 
