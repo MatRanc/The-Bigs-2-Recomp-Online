@@ -1485,6 +1485,7 @@ def main():
                   "frame_rate", "render_target_path_vulkan"):
             print(f"  {k} = {values.get(k)!r}")
         print("launcher:", app.find_launcher())
+        print("theme engine:", "sv-ttk" if sv_ttk is not None else "clam fallback")
         app.destroy()
         return
     try:

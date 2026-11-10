@@ -36,14 +36,17 @@ jobs:
         run: >
           pyinstaller --noconfirm --clean --onefile --windowed --name "The Bigs 2 Launcher"
           --icon assets/bigs2-logo.png
-          --add-data "vendor/sv_ttk:vendor/sv_ttk"
+          --paths vendor --hidden-import sv_ttk
+          --add-data "vendor/sv_ttk/sv.tcl:sv_ttk" --add-data "vendor/sv_ttk/theme:sv_ttk/theme"
           --add-data "assets/theme-icons:assets/theme-icons"
           --add-data "assets/bigs2-logo.png:assets"
           --add-data "assets/bigs2-logo-128.png:assets"
           thebigs2_gui.py
       - name: Check
         if: runner.os == 'Linux'
-        run: python thebigs2_gui.py --online-env Host Test
+        run: |
+          python thebigs2_gui.py --online-env Host Test
+          python -c "import sys; sys.path.insert(0, 'vendor'); import sv_ttk; print('sv_ttk', sv_ttk.__file__)"
       - name: Package (macOS app as zip, keeps the bundle intact)
         if: runner.os == 'macOS'
         run: cd dist && ditto -c -k --keepParent "The Bigs 2 Launcher.app" "The Bigs 2 Launcher.app.zip" && rm -rf "The Bigs 2 Launcher.app" "The Bigs 2 Launcher"
