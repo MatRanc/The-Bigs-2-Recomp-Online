@@ -27,6 +27,7 @@
 #include <string>
 #include <string_view>
 
+#include "guest_memory.h"
 #include <rex/hook.h>
 #include <rex/logging.h>
 #include <rex/system/kernel_state.h>
@@ -219,16 +220,16 @@ extern "C" REX_FUNC(sub_8240BD00) {
   const uint32_t out_size_ptr = ctx.r5.u32;
   static const bool log_inflate = std::getenv("TB2_INFLATE_LOG") != nullptr;
   const uint32_t src = ctx.r3.u32, src_size = ctx.r4.u32;
-  const uint32_t src_crc = log_inflate && src && src_size < (64u << 20) ? Crc32(base + src, src_size) : 0;
+  const uint32_t src_crc = log_inflate && src && src_size < (64u << 20) ? Crc32(GuestPtr(base, src), src_size) : 0;
   __imp__sub_8240BD00(ctx, base);
   const uint32_t buffer = ctx.r3.u32;
   if (log_inflate) {
-    const uint32_t out_size = out_size_ptr ? LoadBE32(base + out_size_ptr) : 0;
-    const uint32_t out_crc = buffer && out_size < (256u << 20) ? Crc32(base + buffer, out_size) : 0;
+    const uint32_t out_size = out_size_ptr ? LoadBE32(GuestPtr(base, out_size_ptr)) : 0;
+    const uint32_t out_crc = buffer && out_size < (256u << 20) ? Crc32(GuestPtr(base, buffer), out_size) : 0;
     REXLOG_INFO("Inflate in {} {:08x} out {} {:08x}", src_size, src_crc, out_size, out_crc);
   }
-  if (!buffer || !out_size_ptr || LoadBE32(base + out_size_ptr) != kTitleSize) return;
-  char* text = reinterpret_cast<char*>(base + buffer);
+  if (!buffer || !out_size_ptr || LoadBE32(GuestPtr(base, out_size_ptr)) != kTitleSize) return;
+  char* text = reinterpret_cast<char*>(GuestPtr(base, buffer));
   if (std::string_view(text, kTitleStart.size()) != kTitleStart) return;
   const std::string patched = PatchMainMenu(std::string_view(text, kTitleSize));
   if (patched.size() != kTitleSize) {
@@ -252,8 +253,8 @@ extern "C" REX_FUNC(sub_824A35D0) {
   uint32_t address = strings[index].load();
   if (!address) {
     address = REX_KERNEL_MEMORY()->SystemHeapAlloc(uint32_t(text.size() + 1));
-    std::memcpy(base + address, text.data(), text.size());
-    base[address + text.size()] = 0;
+    std::memcpy(GuestPtr(base, address), text.data(), text.size());
+    (*GuestPtr(base, address + text.size())) = 0;
     uint32_t expected = 0;
     if (!strings[index].compare_exchange_strong(expected, address)) {
       REX_KERNEL_MEMORY()->SystemHeapFree(address);
@@ -266,7 +267,7 @@ extern "C" REX_FUNC(sub_824A35D0) {
 // The title screen's command handler (this, command {type, name hash, ...}).
 extern "C" REX_FUNC(__imp__sub_82326E48);
 extern "C" REX_FUNC(sub_82326E48) {
-  const uint8_t* command = base + ctx.r4.u32;
+  const uint8_t* command = GuestPtr(base, ctx.r4.u32);
   if (LoadBE32(command) == kCommandAction) {
     const uint32_t name = LoadBE32(command + 4);
     if (name == NameHash(kRecompSettings)) {

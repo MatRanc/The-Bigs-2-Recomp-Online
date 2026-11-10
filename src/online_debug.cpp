@@ -32,6 +32,7 @@
 #include <string>
 
 #include <fmt/format.h>
+#include "guest_memory.h"
 #include <rex/hook.h>
 #include <rex/logging.h>
 #include <rex/system/kernel_state.h>
@@ -57,7 +58,7 @@ namespace {
 
 uint32_t LoadGuestU32(uint8_t* base, uint32_t addr) {
   uint32_t v = 0;
-  std::memcpy(&v, base + addr, sizeof(v));
+  std::memcpy(&v, GuestPtr(base, addr), sizeof(v));
   return __builtin_bswap32(v);
 }
 
@@ -70,11 +71,11 @@ bool OncePerSecond(std::chrono::steady_clock::time_point& last) {
   return true;
 }
 
-void StoreGuestU8(uint8_t* base, uint32_t addr, uint8_t v) { base[addr] = v; }
+void StoreGuestU8(uint8_t* base, uint32_t addr, uint8_t v) { (*GuestPtr(base, addr)) = v; }
 
 void StoreGuestU32(uint8_t* base, uint32_t addr, uint32_t v) {
   v = __builtin_bswap32(v);
-  std::memcpy(base + addr, &v, sizeof(v));
+  std::memcpy(GuestPtr(base, addr), &v, sizeof(v));
 }
 
 }  // namespace
@@ -175,16 +176,16 @@ uint32_t GuestAlloc(PPCContext& parent, uint8_t* base, uint32_t size, uint32_t f
 
 void StoreGuestU16(uint8_t* base, uint32_t addr, uint16_t v) {
   v = __builtin_bswap16(v);
-  std::memcpy(base + addr, &v, sizeof(v));
+  std::memcpy(GuestPtr(base, addr), &v, sizeof(v));
 }
 
 void StoreGuestU64(uint8_t* base, uint32_t addr, uint64_t v) {
   v = __builtin_bswap64(v);
-  std::memcpy(base + addr, &v, sizeof(v));
+  std::memcpy(GuestPtr(base, addr), &v, sizeof(v));
 }
 
 void StoreGuestBytes(uint8_t* base, uint32_t addr, const void* src, size_t len) {
-  std::memcpy(base + addr, src, len);
+  std::memcpy(GuestPtr(base, addr), src, len);
 }
 
 void EnqueueLiveEvent(PPCContext& parent, uint8_t* base, uint32_t id) {
@@ -204,7 +205,7 @@ uint32_t BuildFakeSearchResults(PPCContext& parent, uint8_t* base) {
 
   const uint32_t block = GuestAlloc(parent, base, kTotal, 1);
   if (!block) return 0;
-  std::memset(base + block, 0, kTotal);
+  std::memset(GuestPtr(base, block), 0, kTotal);
 
   const uint32_t result = block + kHeaderSize;
   const uint32_t props = result + kResultSize;
@@ -314,7 +315,7 @@ void MaybeInjectFakeAccount(PPCContext& parent, uint8_t* base) {
     REXLOG_WARN("OnlineDebug: TB2_FAKE_ACCOUNT: pending allocation failed");
     return;
   }
-  std::memset(base + pending, 0, 0x38);
+  std::memset(GuestPtr(base, pending), 0, 0x38);
 
   StoreGuestU32(base, pending + 0x00, 0);  // user index
   char name[16] = {};
@@ -329,7 +330,7 @@ void MaybeInjectFakeAccount(PPCContext& parent, uint8_t* base) {
   // participant table and the Game Room draws it as the gamertag; the game also uses its first
   // 8 bytes as an id (stats lookups, slot matching). So it holds the NUL-padded name.
   // shortcut: names sharing their first 8 chars get the same id; fine for two friends, revisit for lobbies.
-  std::memcpy(base + pending + 0x08, name, 16);
+  std::memcpy(GuestPtr(base, pending + 0x08), name, 16);
   StoreGuestU32(base, pending + 0x18, 0);  // account type (0 = Live account)
   StoreGuestU64(base, pending + 0x1C, TB2XuidFromName(name));  // XUID (drawn as the name)
   StoreGuestU32(base, pending + 0x24, 0);  // user flags
@@ -406,8 +407,8 @@ extern "C" REX_FUNC(sub_823F82D8) {
   const uint32_t result = block + 0x08;
   REXLOG_INFO("OnlineDebug: injected synthetic search result (mgr=0x{:08X}, block=0x{:08X}, "
               "peer={}.{}.{}.{}:{}, xnkid=0x{:016X})",
-              manager, block, base[result + 0x08], base[result + 0x09], base[result + 0x0A],
-              base[result + 0x0B], (uint32_t)((base[result + 0x10] << 8) | base[result + 0x11]),
+              manager, block, (*GuestPtr(base, result + 0x08)), (*GuestPtr(base, result + 0x09)), (*GuestPtr(base, result + 0x0A)),
+              (*GuestPtr(base, result + 0x0B)), (uint32_t)(((*GuestPtr(base, result + 0x10)) << 8) | (*GuestPtr(base, result + 0x11))),
               ((uint64_t)LoadGuestU32(base, result) << 32) | LoadGuestU32(base, result + 4));
 }
 
@@ -423,11 +424,11 @@ extern "C" REX_FUNC(sub_822A5328) {
   // (*(DAT_82633548+4) is null); 822A5328 then reads its vtable and faults.
   {
     uint32_t mgr_ptr, ui;
-    std::memcpy(&mgr_ptr, base + 0x82633548, 4);
+    std::memcpy(&mgr_ptr, GuestPtr(base, 0x82633548), 4);
     mgr_ptr = __builtin_bswap32(mgr_ptr);
     ui = 0;
     if (mgr_ptr) {
-      std::memcpy(&ui, base + mgr_ptr + 4, 4);
+      std::memcpy(&ui, GuestPtr(base, mgr_ptr + 4), 4);
       ui = __builtin_bswap32(ui);
     }
     if (!ui) {
@@ -464,7 +465,7 @@ extern "C" REX_FUNC(sub_82287700) {
     if (!suppress && type == 0xDFC52393 && ctx.r5.u32) {
       // The dialog text is passed as a guest string pointer; only drop the
       // game-room join one (0xDFC52393 is a generic "show text" message).
-      const char* text = reinterpret_cast<const char*>(base + ctx.r5.u32);
+      const char* text = reinterpret_cast<const char*>(GuestPtr(base, ctx.r5.u32));
       suppress = std::strncmp(text, "Attempting to join", 18) == 0;
     }
     if (suppress) {
@@ -483,7 +484,7 @@ static bool g_return_to_menu_pending = false;
 static uint32_t g_stats_mgr = 0;  // stats manager with a pending request; ticked from the per-frame hook
 static inline uint32_t gbe32(uint8_t* base, uint32_t ea) {
   uint32_t v;
-  std::memcpy(&v, base + ea, 4);
+  std::memcpy(&v, GuestPtr(base, ea), 4);
   return __builtin_bswap32(v);
 }
 
@@ -580,11 +581,11 @@ extern "C" REX_FUNC(sub_82289560) {
   // overlapped stats result is never collected. Tick it while any slot is pending.
   if (g_stats_mgr) {
     const uint32_t m = g_stats_mgr;
-    if (base[m + 0x104] || base[m + 0x105] || base[m + 0x106]) {
+    if ((*GuestPtr(base, m + 0x104)) || (*GuestPtr(base, m + 0x105)) || (*GuestPtr(base, m + 0x106))) {
       static std::chrono::steady_clock::time_point last_tick_log{};
       if (std::getenv("TB2_ONLINE_DEBUG") && OncePerSecond(last_tick_log)) {
         REXLOG_INFO("OnlineDebug: ticking stats mgr 0x{:08X} flags={}{}{} ov0=0x{:08X} ov1=0x{:08X} buf0=0x{:08X} buf1=0x{:08X}",
-                    m, base[m + 0x104], base[m + 0x105], base[m + 0x106],
+                    m, (*GuestPtr(base, m + 0x104)), (*GuestPtr(base, m + 0x105)), (*GuestPtr(base, m + 0x106)),
                     LoadGuestU32(base, m + 0xB0), LoadGuestU32(base, m + 0xB0 + 0x1C),
                     LoadGuestU32(base, m + 0x108), LoadGuestU32(base, m + 0x10C));
       }
@@ -783,8 +784,8 @@ extern "C" REX_FUNC(sub_823F46C0) {
           "OnlineDebug: 823F46C0 info=0x{:08X} arg3={} xnkid=0x{:016X} "
           "ina={}.{}.{}.{} online={}.{}.{}.{} port={} key0=0x{:08X}",
           info, arg3, ((uint64_t)LoadGuestU32(base, si) << 32) | LoadGuestU32(base, si + 4),
-          base[si + 8], base[si + 9], base[si + 10], base[si + 11], base[si + 12], base[si + 13],
-          base[si + 14], base[si + 15], (uint32_t)((base[si + 0x10] << 8) | base[si + 0x11]),
+          (*GuestPtr(base, si + 8)), (*GuestPtr(base, si + 9)), (*GuestPtr(base, si + 10)), (*GuestPtr(base, si + 11)), (*GuestPtr(base, si + 12)), (*GuestPtr(base, si + 13)),
+          (*GuestPtr(base, si + 14)), (*GuestPtr(base, si + 15)), (uint32_t)(((*GuestPtr(base, si + 0x10)) << 8) | (*GuestPtr(base, si + 0x11))),
           LoadGuestU32(base, si + 0x2C));
     } else {
       REXLOG_INFO("OnlineDebug: 823F46C0 info=0 arg3={}", arg3);
@@ -814,7 +815,7 @@ extern "C" REX_FUNC(sub_823ECEE0) {
   __imp__sub_823ECEE0(ctx, base);
   if (std::getenv("TB2_ONLINE_DEBUG")) {
     REXLOG_INFO("OnlineDebug: 823ECEE0 enqueued event 0x42 (session+152={})",
-                ctx.r3.u32 ? (uint32_t)base[ctx.r3.u32 + 152] : 0);
+                ctx.r3.u32 ? (uint32_t)(*GuestPtr(base, ctx.r3.u32 + 152)) : 0);
   }
 }
 
@@ -923,7 +924,7 @@ extern "C" REX_FUNC(sub_823EE498) {
                 saved_user, fix);
     if (ctx.r4.u32) {
       char hex[64] = {};
-      for (int i = 0; i < 16; i++) std::snprintf(hex + i * 2, 3, "%02X", base[ctx.r4.u32 + i]);
+      for (int i = 0; i < 16; i++) std::snprintf(hex + i * 2, 3, "%02X", (*GuestPtr(base, ctx.r4.u32 + i)));
       REXLOG_INFO("OnlineDebug: 823EE498 xuid record @0x{:08X} = {}", ctx.r4.u32, hex);
     }
   }
@@ -941,7 +942,7 @@ extern "C" REX_FUNC(sub_823FA9F8) {
   static std::chrono::steady_clock::time_point last{};
   if (std::getenv("TB2_ONLINE_DEBUG") && ctx.r3.u32 && ctx.r4.u32 < 3 && OncePerSecond(last)) {
     const uint32_t m = ctx.r3.u32, slot = ctx.r4.u32;
-    const uint32_t flag = base[m + 0x104 + slot];
+    const uint32_t flag = (*GuestPtr(base, m + 0x104 + slot));
     if (flag) {
       REXLOG_INFO("OnlineDebug: 823FA9F8 poll slot {} flag={} overlapped[0]=0x{:08X} buf=0x{:08X}",
                   slot, flag, LoadGuestU32(base, m + 0xB0 + slot * 0x1C),
@@ -960,7 +961,7 @@ extern "C" REX_FUNC(sub_8234E1F0) {
     const uint32_t x = g ? LoadGuestU32(base, g + 0x1c) : 0;
     const uint32_t p = x ? LoadGuestU32(base, x + 8) : 0;
     REXLOG_INFO("OnlineDebug: 8234E1F0 Game Room enter, game-state flag +0xE0 = {}",
-                p ? int(base[p + 0xE0]) : -1);
+                p ? int((*GuestPtr(base, p + 0xE0))) : -1);
   }
   __imp__sub_8234E1F0(ctx, base);
 }
@@ -1135,7 +1136,7 @@ extern "C" REX_FUNC(sub_823F7AA0) {
   {
     const uint32_t obj = ctx.r4.u32;
     const uint32_t data = obj ? LoadGuestU32(base, obj) : 0;
-    g_skip_empty_table = data && LoadGuestU32(base, data) == 10 && base[data + 4] == 0;
+    g_skip_empty_table = data && LoadGuestU32(base, data) == 10 && (*GuestPtr(base, data + 4)) == 0;
   }
   if (std::getenv("TB2_ONLINE_DEBUG")) {
     const uint32_t session = ctx.r3.u32;
@@ -1161,9 +1162,9 @@ extern "C" REX_FUNC(sub_823F6CD8) {
 // Participant monitor / timer check (sets participant+12 = 1 on timeout or socket closed).
 extern "C" REX_FUNC(sub_823F65D8) {
   const uint32_t part = ctx.r3.u32;
-  const uint8_t old_status = part ? base[part + 12] : 0;
+  const uint8_t old_status = part ? (*GuestPtr(base, part + 12)) : 0;
   __imp__sub_823F65D8(ctx, base);
-  const uint8_t new_status = part ? base[part + 12] : 0;
+  const uint8_t new_status = part ? (*GuestPtr(base, part + 12)) : 0;
   if (std::getenv("TB2_ONLINE_DEBUG") && old_status != new_status) {
     REXLOG_INFO("OnlineDebug: 823F65D8 participant 0x{:08X} status changed {} -> {} (transport=0x{:08X})",
                 part, (uint32_t)old_status, (uint32_t)new_status, part ? LoadGuestU32(base, part + 8) : 0);
@@ -1178,7 +1179,7 @@ extern "C" REX_FUNC(sub_8241F158) {
     const uint32_t obj = ctx.r3.u32;
     if (obj) {
       REXLOG_INFO("OnlineDebug: 8241F158 obj=0x{:08X} addr32=0x{:08X} port16={} lr=0x{:08X}",
-                  obj, LoadGuestU32(base, obj + 42), (uint32_t)((base[obj + 46] << 8) | base[obj + 47]),
+                  obj, LoadGuestU32(base, obj + 42), (uint32_t)(((*GuestPtr(base, obj + 46)) << 8) | (*GuestPtr(base, obj + 47))),
                   (uint32_t)ctx.lr);
     }
   }
@@ -1188,7 +1189,7 @@ extern "C" REX_FUNC(sub_8241F158) {
 // Port-source chain (see docs/ONLINE_P2P_HANDOFF.md): log the 16-byte record
 // the connect path copies and its port halfword (+14), with the caller lr.
 static uint32_t PortAt(uint8_t* base, uint32_t addr) {
-  return (uint32_t)((base[addr] << 8) | base[addr + 1]);
+  return (uint32_t)(((*GuestPtr(base, addr)) << 8) | (*GuestPtr(base, addr + 1)));
 }
 extern "C" REX_FUNC(__imp__sub_823E5208);
 extern "C" REX_FUNC(sub_823E5208) {
@@ -1217,7 +1218,7 @@ extern "C" REX_FUNC(sub_823ED638) {
   if (std::getenv("TB2_ONLINE_DEBUG")) {
     const uint32_t obj = ctx.r3.u32;
     REXLOG_INFO("OnlineDebug: 823ED638 obj=0x{:08X} +90={} +C0={} lr=0x{:08X}", obj,
-                (uint32_t)base[obj + 0x90], LoadGuestU32(base, obj + 0xC0), (uint32_t)ctx.lr);
+                (uint32_t)(*GuestPtr(base, obj + 0x90)), LoadGuestU32(base, obj + 0xC0), (uint32_t)ctx.lr);
   }
   __imp__sub_823ED638(ctx, base);
 }
@@ -1538,7 +1539,7 @@ extern "C" REX_FUNC(sub_822B8460) {
   if (std::getenv("TB2_CTRL_TRACE") && i < 16 && OncePerSecond(last[i])) {
     const uint32_t rec = LoadGuestU32(base, 0x82633BF0 + 4 * i);
     REXLOG_INFO("CtrlTrace: pad {} active={} rec=0x{:08X} connected(+2FA4)={} state(+2FA8)={}", i, ctx.r3.u32 & 0xFF, rec,
-                rec ? base[rec + 0x2FA4] : 0xFF, rec ? LoadGuestU32(base, rec + 0x2FA8) : 0xFFFFFFFF);
+                rec ? (*GuestPtr(base, rec + 0x2FA4)) : 0xFF, rec ? LoadGuestU32(base, rec + 0x2FA8) : 0xFFFFFFFF);
   }
 }
 
@@ -1642,9 +1643,9 @@ TB2_CMP_PROBE(823E3E90)
     const uint32_t s = ctx.r3.u32, a4 = ctx.r4.u32, a5 = ctx.r5.u32, a6 = ctx.r6.u32, lr = (uint32_t)ctx.lr; \
     __imp__sub_##ADDR(ctx, base);                                                                         \
     if (std::getenv("TB2_CTRL_TRACE")) {                                                                  \
-      std::string b; for (int i = 0; i < 16; i++) b += fmt::format("{:02x}", base[s + 80 + i]);          \
+      std::string b; for (int i = 0; i < 16; i++) b += fmt::format("{:02x}", (*GuestPtr(base, s + 80 + i)));          \
       std::string w, t; for (int i = 0; i < 4; i++) w += fmt::format("{:x} ", LoadGuestU32(base, s + 132 + 4 * i)); \
-      for (int i = 0; i < 16; i++) t += fmt::format("{:02x}", base[s + 116 + i]);                         \
+      for (int i = 0; i < 16; i++) t += fmt::format("{:02x}", (*GuestPtr(base, s + 116 + i)));                         \
       REXLOG_INFO("JoinProbe " #ADDR "(scr={:#x} pad={} a5={} a6={:#x}) lr={:#x} bytes80={} words132={} tok116={} mode={}", s, (int)a4, a5, a6, lr, b, w, t, LoadGuestU32(base, LoadGuestU32(base, LoadGuestU32(base, 0x825E0000 + 9588) + 28) + 36)); \
     }                                                                                                     \
   }
@@ -1750,7 +1751,7 @@ static bool IsOwnIp(uint32_t ip) {
 extern "C" REX_FUNC(__imp__sub_823CDD10);
 extern "C" REX_FUNC(sub_823CDD10) {
   if (ctx.r4.u32) {
-    uint8_t* p = base + ctx.r4.u32 + 2;  // sin_port
+    uint8_t* p = GuestPtr(base, ctx.r4.u32 + 2);  // sin_port
     const uint16_t port = uint16_t(p[0] << 8 | p[1]);
     const uint32_t ip = LoadGuestU32(base, ctx.r4.u32 + 4);
     if ((port == 1795 || port == 1796) && (port == 1796 || IsOwnIp(ip))) {  // 1796 is only used on one machine
