@@ -66,8 +66,8 @@ set up.
 
 Without Tailscale, over the internet: pick **Over the internet (advanced: port
 forwarding)**. The host forwards **TCP 51000** and **UDP 1795** on their router
-to their PC, presses **Find my address** (this asks api.ipify.org once) and
-sends that address to the friend. The friend picks the same option and enters
+to their PC ([how?](https://lmgtfy.com/?q=how+to+port+forward)), presses
+**Find my address** and sends that address to the friend. The friend picks the same option and enters
 the address.
 
 ## Can't connect?
