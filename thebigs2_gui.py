@@ -1347,6 +1347,9 @@ class Launcher(tk.Tk):
                         return path
                 except OSError:
                     continue
+        beside = os.path.join(ROOT, "thebigs2")  # macOS release zip: the game sits next to the launcher
+        if os.path.isfile(beside) and os.access(beside, os.X_OK):
+            return beside
         return self._dev_build()
 
     @staticmethod

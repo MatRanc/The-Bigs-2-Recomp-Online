@@ -42,5 +42,18 @@ cmake -S "$ROOT" -B "$BUILD" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_
   -DCMAKE_OSX_ARCHITECTURES="$(uname -m)"
 cmake --build "$BUILD"
 
+# 3. Release zip: the game folder (exe, dylibs, Vulkan/MoltenVK) + the launcher. No game data.
+NAME="TheBigs2-macos-$(uname -m)"
+STAGE="$ROOT/out/macos/$NAME"
+rm -rf "$STAGE" && mkdir -p "$STAGE/vendor" "$STAGE/assets"
+cp "$BUILD/thebigs2" "$BUILD"/*.dylib "$STAGE/"
+[ -d "$BUILD/vulkan" ] && cp -R "$BUILD/vulkan" "$STAGE/"
+[ -f "$BUILD/gamecontrollerdb.txt" ] && cp "$BUILD/gamecontrollerdb.txt" "$STAGE/"
+cp "$ROOT/thebigs2_gui.py" "$STAGE/"
+cp -R "$ROOT/vendor/sv_ttk" "$STAGE/vendor/" && rm -rf "$STAGE/vendor/sv_ttk/__pycache__"
+cp -R "$ROOT/assets/theme-icons" "$ROOT/assets/bigs2-logo-128.png" "$ROOT/assets/bigs2-logo.png" "$STAGE/assets/"
+(cd "$ROOT/out/macos" && rm -f "$NAME.zip" && zip -qry "$NAME.zip" "$NAME")
+
 echo
-echo "Built $BUILD/thebigs2. Start the launcher with: python3 $ROOT/thebigs2_gui.py"
+echo "Built $BUILD/thebigs2 and $ROOT/out/macos/$NAME.zip"
+echo "Start the launcher with: python3 $ROOT/thebigs2_gui.py"

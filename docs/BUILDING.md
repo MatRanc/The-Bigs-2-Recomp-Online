@@ -1,14 +1,15 @@
 # Building The Bigs 2
 
-Everything is built on **Linux**: the Linux and Steam Deck AppImages, and the
-Windows zip (cross-compiled). Tested on Ubuntu 24.04 with Clang 20.
+The Linux and Windows releases are built on **Linux** (the Windows zip is
+cross-compiled). Tested on Ubuntu 24.04 with Clang 20 and Fedora 44 with
+Clang 22. The macOS release is built on a Mac (see *macOS* below).
 
 Overview:
 
 1. Build and install the ReXGlue SDK.
 2. Put your extracted game files in `game/`.
 3. Build the game (the recompiler runs as part of the build).
-4. Package it: AppImage, Steam Deck AppImage, Windows zip.
+4. Package it: Linux archive (AppImages + launcher), Windows zip, macOS zip.
 
 ## 1. The ReXGlue SDK
 
@@ -99,6 +100,18 @@ Logs are in `out/build/linux-amd64-release/logs/`.
 
 ## 4. Packaging
 
+The release files are one archive per system, each with the game and the
+launcher (`thebigs2_gui.py`) and no game data:
+
+```bash
+packaging/build-linux.sh     # out/linux/TheBigs2-linux-x64.tar.gz (both AppImages + launcher)
+packaging/build-windows.sh   # out/windows/TheBigs2-windows-x64.zip
+packaging/build-macos.sh     # on a Mac: out/macos/TheBigs2-macos-<arch>.zip
+```
+
+Configure the Linux build without `-DTB2_FN_TRACE=ON` (a debug option) before
+packaging. To publish, attach the three files to a GitHub release.
+
 ### Linux AppImage
 
 ```bash
@@ -154,8 +167,25 @@ Those DLLs are needed: with an older `msvcp140.dll`, matches run at 1-2 fps.
 Under Wine, use them with
 `WINEDLLOVERRIDES="msvcp140,msvcp140_atomic_wait,vcruntime140,vcruntime140_1=n"`.
 
+The toolchain file uses `clang-20`, `llvm-rc-20`, ... when they exist and the
+unversioned names otherwise. `lld` and `cabextract` can live in `~/.local`
+(e.g. unpacked from your distro's packages) if you can't install them
+system-wide; only `PATH` has to find them.
+
 The `win-amd64-release` preset is for building natively on Windows with
 Visual Studio 2022 and its Clang tools. It hasn't been tested.
+
+### macOS (on the Mac)
+
+```bash
+xcode-select --install
+brew install cmake ninja python-tk
+packaging/build-macos.sh
+```
+
+The script clones and builds the SDK fork (branch `tb2-online`) into
+`~/rexsdk-install`, builds the game into `out/build/mac-release/` (needs
+`game/default.xex`, see step 2) and zips it with the launcher. Not tested yet.
 
 ## Project layout
 
