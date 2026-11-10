@@ -20,6 +20,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <iterator>
@@ -198,14 +199,34 @@ std::string PatchMainMenu(std::string_view original) {
   return text;
 }
 
+// CRC-32 (zlib polynomial) for TB2_INFLATE_LOG.
+uint32_t Crc32(const uint8_t* p, size_t n) {
+  uint32_t c = 0xFFFFFFFFu;
+  for (size_t i = 0; i < n; ++i) {
+    c ^= p[i];
+    for (int k = 0; k < 8; ++k) c = (c >> 1) ^ (0xEDB88320u & (0u - (c & 1u)));
+  }
+  return ~c;
+}
+
 }  // namespace
 
 // sub_8240BD00(src, src_size, out_size*, ...) returns the new buffer.
+// TB2_INFLATE_LOG=1 logs a checksum of every input and output, to compare platforms (the same game files must give
+// the same lines on Linux, Windows and macOS; sort the lines before comparing, the order depends on threads).
 extern "C" REX_FUNC(__imp__sub_8240BD00);
 extern "C" REX_FUNC(sub_8240BD00) {
   const uint32_t out_size_ptr = ctx.r5.u32;
+  static const bool log_inflate = std::getenv("TB2_INFLATE_LOG") != nullptr;
+  const uint32_t src = ctx.r3.u32, src_size = ctx.r4.u32;
+  const uint32_t src_crc = log_inflate && src && src_size < (64u << 20) ? Crc32(base + src, src_size) : 0;
   __imp__sub_8240BD00(ctx, base);
   const uint32_t buffer = ctx.r3.u32;
+  if (log_inflate) {
+    const uint32_t out_size = out_size_ptr ? LoadBE32(base + out_size_ptr) : 0;
+    const uint32_t out_crc = buffer && out_size < (256u << 20) ? Crc32(base + buffer, out_size) : 0;
+    REXLOG_INFO("Inflate in {} {:08x} out {} {:08x}", src_size, src_crc, out_size, out_crc);
+  }
   if (!buffer || !out_size_ptr || LoadBE32(base + out_size_ptr) != kTitleSize) return;
   char* text = reinterpret_cast<char*>(base + buffer);
   if (std::string_view(text, kTitleStart.size()) != kTitleStart) return;
