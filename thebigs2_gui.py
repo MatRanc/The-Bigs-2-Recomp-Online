@@ -245,6 +245,14 @@ def tailscale_ip():
     return next((ip for ip in local_ips() if is_tailscale_ip(ip)), None)
 
 
+def lan_ip():
+    """This machine's address on the home network (192.168.x.y and the like), or None."""
+    def private(ip):
+        a, b = (int(x) for x in ip.split(".")[:2])
+        return a == 10 or (a == 172 and 16 <= b <= 31) or (a == 192 and b == 168)
+    return next((ip for ip in local_ips() if private(ip)), None)
+
+
 def public_ip():
     """This network's public address, from an IP-echo service (only called when the user asks)."""
     with urllib.request.urlopen(PUBLIC_IP_URL, timeout=6) as r:
@@ -1072,16 +1080,27 @@ class Launcher(tk.Tk):
                   style="Hint.TLabel").pack(side="left", padx=(10, 0))
         rows["name"] = (label(2, "Player name"), name_row)
 
-        # Host: this machine's address to send to the friend.
-        addr_row = ttk.Frame(body)
-        addr_row.grid(row=3, column=1, sticky="w", pady=pad["pady"])
+        # Host: this machine's address to send to the friend, plus the home-network one.
+        addr_box = ttk.Frame(body)
+        addr_box.grid(row=3, column=1, sticky="w", pady=pad["pady"])
+        addr_row = ttk.Frame(addr_box)
+        addr_row.pack(anchor="w")
+        lan_row = ttk.Frame(addr_box)
+        lan_row.pack(anchor="w", pady=(8, 0))
+        self._lan_label = ttk.Label(lan_row, text="", style="Hint.TLabel")
+        self._lan_label.pack(side="left")
+        self._lan_copy = ttk.Button(lan_row, text="Copy", padding=(6, 1),
+                                    command=lambda: self._copy_text(self._lan_ip, self._lan_copy))
+        self._lan_copy.pack(side="left", padx=(12, 0))
+        self._lan_row = lan_row
+        self._lan_ip = None
         self._addr_label = ttk.Label(addr_row, text="")
         self._addr_label.pack(side="left")
         self._copy_btn = ttk.Button(addr_row, text="Copy", padding=(6, 1), command=self._copy_address)
         self._copy_btn.pack(side="left", padx=(12, 0))
         self._public_btn = ttk.Button(addr_row, text="Show my public IP", padding=(6, 1),
                                       command=self._fetch_public_ip)
-        rows["addr"] = (label(3, "Your address"), addr_row)
+        rows["addr"] = (label(3, "Your address"), addr_box)
 
         # Join: the host's address.
         peer_row = ttk.Frame(body)
@@ -1125,6 +1144,12 @@ class Launcher(tk.Tk):
                     self._copy_btn.configure(state="normal" if self._public_ip else "disabled")
                     if not self._public_ip:
                         self._public_btn.pack(side="left", padx=(12, 0))
+            self._lan_ip = lan_ip() if mode == "Host" else None
+            if self._lan_ip:
+                self._lan_label.configure(text=f"Friend on the same home network: {self._lan_ip}")
+                self._lan_row.pack(anchor="w", pady=(8, 0))
+            else:
+                self._lan_row.pack_forget()
             if online and net == "Tailscale" and not ts:
                 self._get_ts.pack(side="left", padx=(0, 18))
             self._hint.configure(text=self._online_hint(mode, net, ts))
@@ -1147,7 +1172,8 @@ class Launcher(tk.Tk):
                          "public IP to your friend. (The button asks api.ipify.org once; nothing is stored.)")
             return first + "\nIn the game: ONLINE > Quick Match > Search, then press X (Create Game)."
         first = ("Enter the address your host sent you (100.x.y.z with Tailscale)." if net == "Tailscale"
-                 else "Enter the host's public IP; the host has to forward the game's ports.")
+                 else "Enter the host's public IP (the host forwards the game's ports), or their 192.168.x.y "
+                 "address if you're on the same home network.")
         return first + "\nStart after the host. In the game: ONLINE > Quick Match > Search."
 
     def _update_launch_label(self):
@@ -1157,12 +1183,16 @@ class Launcher(tk.Tk):
 
     def _copy_address(self):
         text = self._addr_label.cget("text")
-        if not text or " " in text:
+        if text and " " not in text:
+            self._copy_text(text, self._copy_btn)
+
+    def _copy_text(self, text, button):
+        if not text:
             return
         self.clipboard_clear()
         self.clipboard_append(text)
-        self._copy_btn.configure(text="Copied!")
-        self.after(1500, lambda: self._copy_btn.configure(text="Copy"))
+        button.configure(text="Copied!")
+        self.after(1500, lambda: button.configure(text="Copy"))
 
     def _paste_peer(self):
         try:

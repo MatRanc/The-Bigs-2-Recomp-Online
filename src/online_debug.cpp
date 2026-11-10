@@ -1773,3 +1773,41 @@ extern "C" REX_FUNC(sub_8230E510) {
   if (std::getenv("TB2_FAKE_ACCOUNT")) { ctx.r3.u64 = 0; return; }
   __imp__sub_8230E510(ctx, base);
 }
+
+// TB2_NET_LOG=1: the lockstep link (GameConn) uses overlapped WSASend/WSARecv, which the SDK doesn't log. Log the
+// first calls in full and then a once-per-second summary, to see on each machine whether data goes out and comes in.
+namespace {
+struct WsaStats { uint32_t calls = 0, ok = 0, logged = 0; };
+WsaStats g_wsa[3];  // 0 send, 1 recv, 2 overlapped result
+std::chrono::steady_clock::time_point g_wsa_last{};
+void WsaTrack(int kind, const char* name, PPCContext& ctx, const uint32_t (&in)[6]) {
+  static const bool on = std::getenv("TB2_NET_LOG") != nullptr;
+  if (!on) return;
+  WsaStats& s = g_wsa[kind];
+  ++s.calls;
+  const uint32_t ret = ctx.r3.u32;
+  if (kind == 2 ? ret != 0 : ret == 0) ++s.ok;  // WSASend/WSARecv: 0 = done now; GetOverlappedResult: TRUE = done
+  if (s.logged < 6) {
+    ++s.logged;
+    REXLOG_INFO("NetTrace {} r3={:#x} r4={:#x} r5={:#x} r6={:#x} r7={:#x} r8={:#x} -> {:#x}", name, in[0], in[1], in[2],
+                in[3], in[4], in[5], ret);
+  }
+  const auto now = std::chrono::steady_clock::now();
+  if (now - g_wsa_last >= std::chrono::seconds(1)) {
+    g_wsa_last = now;
+    REXLOG_INFO("NetTrace per second: WSASend {}/{} ok, WSARecv {}/{} ok, results {}/{} completed",
+                g_wsa[0].ok, g_wsa[0].calls, g_wsa[1].ok, g_wsa[1].calls, g_wsa[2].ok, g_wsa[2].calls);
+    for (auto& w : g_wsa) w.calls = w.ok = 0;
+  }
+}
+}  // namespace
+#define TB2_WSA_TRACE(ADDR, KIND, NAME)                                                                    \
+  extern "C" REX_FUNC(__imp__sub_##ADDR);                                                                \
+  extern "C" REX_FUNC(sub_##ADDR) {                                                                      \
+    const uint32_t in[6] = {ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, ctx.r8.u32};    \
+    __imp__sub_##ADDR(ctx, base);                                                                        \
+    WsaTrack(KIND, NAME, ctx, in);                                                                       \
+  }
+TB2_WSA_TRACE(823CDDF8, 0, "WSASend")
+TB2_WSA_TRACE(823CDDB8, 1, "WSARecv")
+TB2_WSA_TRACE(823CDD70, 2, "WSAGetOverlappedResult")
