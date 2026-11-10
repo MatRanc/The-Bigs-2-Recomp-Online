@@ -199,8 +199,13 @@ crawl at 60 GB; `JOBS=n` overrides. To run the dev build
 step 2.
 
 Status: experimental, tested on Apple Silicon. It builds and runs, and online
-play with a Linux PC works, but player models are spiked, the bat floats and
-matches are slow (Metal through MoltenVK); see the README.
+play with a Linux PC works (a Mac joined a Linux host's Game Room and played a
+match). Known problems, fixes welcome:
+
+- Player models are spiked and the bat floats (graphics through MoltenVK/Metal).
+- Matches run slower than on a PC; online, both players run at the Mac's pace.
+- It defaults to 1x resolution and the "host" render path (the PC defaults
+  glitch on Metal).
 
 ## Project layout
 

@@ -20,7 +20,7 @@ import subprocess
 import sys
 import tkinter as tk
 import tkinter.font as tkfont
-from tkinter import filedialog, messagebox, ttk
+from tkinter import messagebox, ttk
 
 # ROOT is the game folder (game, config/, saves/). The release launcher is a PyInstaller app that sits in that
 # folder (on macOS the folder holding "The Bigs 2 Launcher.app"); its own files (theme, icons) are in RES.
@@ -159,7 +159,6 @@ def save_theme_pref(theme):
 # The host's game room listens on TCP 51000; the match itself (the game's input
 # lockstep) uses UDP 1795. tools/run_pair.sh gets its env from online_env() too.
 ONLINE_PORT = 51000
-ONLINE_MODES = ("Offline", "Host", "Join")
 NAME_MAX = 8  # the game shows the player's id bytes as the name: 8 characters
 
 
@@ -224,11 +223,10 @@ def local_ips():
             seen.append(ip)
     return sorted(seen, key=lambda ip: not ip.startswith("100."))
 
-TAILSCALE_URL = "https://tailscale.com/download"
-GUIDE_URL = "https://github.com/MatRanc/The-Bigs-2-Recomp-Online#play-online-with-a-friend"
-HELP_URL = "https://github.com/MatRanc/The-Bigs-2-Recomp-Online#cant-connect"
+GUIDE_URL = "https://github.com/MatRanc/The-Bigs-2-Recomp-Online/blob/HEAD/docs/PLAY_ONLINE.md"
+TAILSCALE_GUIDE_URL = GUIDE_URL + "#set-up-tailscale"
+HELP_URL = GUIDE_URL + "#cant-connect"
 PUBLIC_IP_URL = "https://api.ipify.org"
-NET_MODES = ("Tailscale", "Public")
 
 
 def is_tailscale_ip(ip):
@@ -371,12 +369,6 @@ def _keyboard_on(v):
 
 
 GROUPS = [
-    ("Game", [
-        {"key": "iso_path", "label": "Disc image (.iso)", "type": "str",
-         "default": "", "file": True,
-         "help": "Optional. Only used to (re)extract the game. Leave empty to "
-                 "use the already extracted game/ folder."},
-    ]),
     ("Display", [
         {"key": "fullscreen", "label": "Fullscreen", "type": "bool", "default": True},
         {"key": "fullscreen_exclusive", "label": "Exclusive fullscreen", "type": "bool",
@@ -450,36 +442,43 @@ GROUPS = [
 ALL_FIELDS = [f for _, fs in GROUPS for f in fs]
 FIELDS_BY_KEY = {f["key"]: f for f in ALL_FIELDS}
 
-# The in-game settings menu's info text for each setting (src/settings_menu.cpp),
-# shown by the launcher's info button on hover.
+# Info text for each setting, shown by the launcher's info button on hover (based on
+# the in-game settings menu's text in src/settings_menu.cpp, some more detailed here).
 _PADBIND_INFO = ("The game button this controller button presses (for every controller; "
                  "the keyboard has its own keys). Applies after a restart.")
 _KEYBIND_INFO = ("The keyboard key(s) for this controller button: one key or several "
                  "separated by commas (\"Q,I\"), with modifiers if needed (\"Shift+Up\"). "
                  "Key names: see thebigs2.toml.")
 INFO = {
-    "iso_path": "Optional. Only used to (re)extract the game. Leave empty to use the "
-                "already extracted game/ folder.",
-    "fullscreen": "Fullscreen, or a window.",
+    "fullscreen": "On: the game fills the screen. Off: it runs in a window, sized by "
+                  "Resolution below.",
     "fullscreen_exclusive": "Borderless uses the desktop's resolution and refresh rate; "
                             "exclusive switches the monitor to the mode below.",
-    "display_resolution": "Window size, or the monitor mode in exclusive fullscreen.",
-    "display_refresh_rate": "Exclusive fullscreen only. Matches run at 30 fps (or 60): "
-                            "60 or 120 Hz move the smoothest.",
-    "monitor": "Monitor to open on.",
-    "present_letterbox": "Black bars on screens of other aspect ratios, instead of "
-                         "stretching.",
-    "resolution_scale": "Internal resolution. Higher is sharper and slower. 1x on GPUs "
-                        "without fragment shader interlock and with 60 fps.",
+    "display_resolution": "In a window: the window's size. In exclusive fullscreen: the mode the "
+                          "monitor switches to (the closest it supports). 'desktop' uses your "
+                          "desktop's resolution. This is the screen size, not how sharp the game "
+                          "renders: that's Render scale.",
+    "display_refresh_rate": "Exclusive fullscreen only; 0 keeps the desktop's rate. Menus run at "
+                            "60 fps and matches at 30 (or 60), so 60 or 120 Hz move the smoothest. "
+                            "144 or 165 Hz judder slightly unless you have VRR (G-Sync/FreeSync).",
+    "monitor": "Which monitor the game opens on: 0 = the system's main one, 1 = the first, "
+               "2 = the second, and so on.",
+    "present_letterbox": "The game is 16:9. On other screens (ultrawide, 16:10 like the Steam "
+                         "Deck) this adds black bars; off stretches the picture to fill.",
+    "resolution_scale": "How sharp the game renders: 1x = the original 720p, 2x = 1440p, "
+                        "3x = 4K. Higher is sharper and needs a faster GPU. Use 1x with 60 fps, "
+                        "and on GPUs without fragment shader interlock (AMD on Linux, Steam Deck).",
     "render_target_path_vulkan": "FSI: accurate, needed at 2x and up with the game's MSAA. "
                                  "Host: faster. GPUs without fragment shader interlock "
                                  "always use host.",
-    "anisotropic_override": "Forcing anisotropic filtering sharpens the field and the "
-                            "stands at a distance.",
+    "anisotropic_override": "Sharpens the field and the stands at a distance. -1 = the game's "
+                            "own, 0 = off, 1-5 = stronger.",
     "scene_msaa": "The game's anti-aliasing on the 3D scene. Automatic: on at 1x, off at "
                   "2x and up and on the Steam Deck. Off saves about half the GPU "
                   "emulation's CPU work.",
-    "present_effect": "How the picture is scaled to the screen.",
+    "present_effect": "How the rendered picture is fitted to your screen. bilinear: smooth "
+                      "(default). cas: a little sharper. fsr: AMD FSR 1 upscaling, sharper "
+                      "edges when the render is smaller than the screen.",
     "frame_rate": "30 is the game's own. 60 is experimental: it needs a fast CPU and GPU "
                   "(1x on the desktop); go back to 30 if it stutters.",
     "mnk_mode": "The keyboard plays as player 1's controller, together with the first pad.",
@@ -1006,6 +1005,7 @@ class Launcher(tk.Tk):
     def _build_tabs(self):
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill="both", expand=True, padx=24, pady=(14, 10))
+        self._build_online_tab()  # first tab; the game asks for the disc image itself on first start
         for name, fields in GROUPS:
             scroll = ScrollFrame(self.notebook)
             self._scrolls.append(scroll)
@@ -1014,13 +1014,14 @@ class Launcher(tk.Tk):
             body.pack(fill="both", expand=True)
             body.columnconfigure(1, weight=1)
             row = 0
+            if name == "Scaling":
+                ttk.Label(body, text="Game running slow? Lower Render scale first (the biggest effect), "
+                          "then set Scene MSAA to Off. Hover ⓘ for what each setting does.",
+                          style="Hint.TLabel", wraplength=560, justify="left").grid(
+                    row=0, column=0, columnspan=2, sticky="w", pady=(0, 14))
+                row = 1
             for i, f in enumerate(fields):
                 row = self._add_field(body, row, f, first=(i == 0))
-            if name == "Game":
-                ttk.Label(body, text="The game asks for your disc image the first time it starts; "
-                          "you only need this to point it at a different one.", style="Hint.TLabel",
-                          wraplength=560, justify="left").grid(row=row, column=1, sticky="w", pady=(10, 0))
-                self._build_online_tab()  # second tab
         # Re-evaluate which settings apply whenever a value changes.
         for var in self.vars.values():
             var.trace_add("write", lambda *_: self._update_gates())
@@ -1028,9 +1029,9 @@ class Launcher(tk.Tk):
 
     def _build_online_tab(self):
         prefs = load_prefs()
-        mode, net = prefs.get("online_mode", "Offline"), prefs.get("online_net", "Tailscale")
-        self.online_mode = tk.StringVar(value=mode if mode in ONLINE_MODES else "Offline")
-        self.online_net = tk.StringVar(value=net if net in NET_MODES else "Tailscale")
+        # Always open offline (nothing goes online unless picked this session); Tailscale is the default way.
+        self.online_mode = tk.StringVar(value="Offline")
+        self.online_net = tk.StringVar(value="Tailscale")
         self.online_name = tk.StringVar(value=prefs.get("online_name") or default_player_name())
         self.online_peer = tk.StringVar(value=prefs.get("online_peer", ""))
         self._public_ip = None
@@ -1049,11 +1050,12 @@ class Launcher(tk.Tk):
             lbl.grid(row=row, column=0, sticky="e", **pad)
             return lbl
 
-        def radios(row, var, choices):
+        def radios(row, var, choices, stack=False):
             f = ttk.Frame(body)
             f.grid(row=row, column=1, sticky="w", pady=pad["pady"])
-            for value, text in choices:
-                ttk.Radiobutton(f, text=text, value=value, variable=var).pack(side="left", padx=(0, 18))
+            for i, (value, text) in enumerate(choices):
+                b = ttk.Radiobutton(f, text=text, value=value, variable=var)
+                b.pack(anchor="w", pady=(6 if i else 0, 0)) if stack else b.pack(side="left", padx=(0, 18))
             return f
 
         self._links = []
@@ -1070,51 +1072,42 @@ class Launcher(tk.Tk):
         label(0, "Play")
         radios(0, self.online_mode, (("Offline", "Offline"), ("Host", "Host a game"), ("Join", "Join a friend")))
         rows = {}
-        rows["net"] = (label(1, "Connect with"),
-                       radios(1, self.online_net, (("Tailscale", "Tailscale (recommended)"),
-                                                   ("Public", "Public IP"))))
+        rows["net"] = (label(1, "Connection"),
+                       radios(1, self.online_net, (("LAN", "Same home network"),
+                                                   ("Tailscale", "Over the internet (Tailscale, recommended)"),
+                                                   ("Public", "Over the internet (advanced: port forwarding)")), stack=True))
+        rows["net"][0].grid_configure(sticky="ne")  # label beside the first of the stacked options
         name_row = ttk.Frame(body)
-        name_row.grid(row=2, column=1, sticky="w", pady=pad["pady"])
+        name_row.grid(row=3, column=1, sticky="w", pady=pad["pady"])
         ttk.Entry(name_row, textvariable=self.online_name, width=12).pack(side="left")
         ttk.Label(name_row, text=f"max {NAME_MAX} characters, different from your friend's",
                   style="Hint.TLabel").pack(side="left", padx=(10, 0))
-        rows["name"] = (label(2, "Player name"), name_row)
+        rows["name"] = (label(3, "Player name"), name_row)
 
-        # Host: this machine's address to send to the friend, plus the home-network one.
-        addr_box = ttk.Frame(body)
-        addr_box.grid(row=3, column=1, sticky="w", pady=pad["pady"])
-        addr_row = ttk.Frame(addr_box)
-        addr_row.pack(anchor="w")
-        lan_row = ttk.Frame(addr_box)
-        lan_row.pack(anchor="w", pady=(8, 0))
-        self._lan_label = ttk.Label(lan_row, text="", style="Hint.TLabel")
-        self._lan_label.pack(side="left")
-        self._lan_copy = ttk.Button(lan_row, text="Copy", padding=(6, 1),
-                                    command=lambda: self._copy_text(self._lan_ip, self._lan_copy))
-        self._lan_copy.pack(side="left", padx=(12, 0))
-        self._lan_row = lan_row
-        self._lan_ip = None
+        # Host: this machine's address (for the chosen connection) to send to the friend.
+        addr_row = ttk.Frame(body)
+        addr_row.grid(row=4, column=1, sticky="w", pady=pad["pady"])
         self._addr_label = ttk.Label(addr_row, text="")
         self._addr_label.pack(side="left")
         self._copy_btn = ttk.Button(addr_row, text="Copy", padding=(6, 1), command=self._copy_address)
         self._copy_btn.pack(side="left", padx=(12, 0))
-        self._public_btn = ttk.Button(addr_row, text="Show my public IP", padding=(6, 1),
+        self._public_btn = ttk.Button(addr_row, text="Find my address", padding=(6, 1),
                                       command=self._fetch_public_ip)
-        rows["addr"] = (label(3, "Your address"), addr_box)
+        rows["addr"] = (label(4, "Your address"), addr_row)
 
         # Join: the host's address.
         peer_row = ttk.Frame(body)
-        peer_row.grid(row=4, column=1, sticky="w", pady=pad["pady"])
+        peer_row.grid(row=5, column=1, sticky="w", pady=pad["pady"])
         ttk.Entry(peer_row, textvariable=self.online_peer, width=20).pack(side="left")
         ttk.Button(peer_row, text="Paste", padding=(6, 1), command=self._paste_peer).pack(side="left", padx=(8, 0))
-        rows["peer"] = (label(4, "Host's address"), peer_row)
+        rows["peer"] = (label(5, "Host's address"), peer_row)
 
         # One or two lines of help for the current choice, plus links.
         self._hint = ttk.Label(body, text="", style="Hint.TLabel", wraplength=540, justify="left")
-        self._hint.grid(row=5, column=1, sticky="w", pady=(18, 0))
+        self._hint.grid(row=6, column=1, sticky="w", pady=(18, 0))
         links = ttk.Frame(body)
-        links.grid(row=6, column=1, sticky="w", pady=(10, 0))
-        self._get_ts = link(links, "Get Tailscale", TAILSCALE_URL)
+        links.grid(row=7, column=1, sticky="w", pady=(10, 0))
+        self._get_ts = link(links, "Tailscale setup guide", TAILSCALE_GUIDE_URL)
         link(links, "How to play online", GUIDE_URL).pack(side="left", padx=(0, 18))
         link(links, "Can't connect?", HELP_URL).pack(side="left", padx=(0, 18))
 
@@ -1134,23 +1127,16 @@ class Launcher(tk.Tk):
             if mode == "Host":
                 self._public_btn.pack_forget()
                 self._copy_btn.pack_forget()
-                if net == "Tailscale" or self._public_ip:
-                    self._copy_btn.pack(side="left", padx=(12, 0))
-                if net == "Tailscale":
-                    self._addr_label.configure(text=ts or "Tailscale isn't running on this PC")
-                    self._copy_btn.configure(state="normal" if ts else "disabled")
+                addr = {"Tailscale": ts, "Public": self._public_ip, "LAN": lan_ip()}[net]
+                missing = {"Tailscale": "Tailscale isn't running on this PC",
+                           "LAN": "Couldn't find this PC's home-network address"}.get(net, "")
+                self._addr_label.configure(text=addr or missing)
+                self._copy_btn.configure(state="normal" if addr else "disabled")
+                if net == "Public" and not addr:
+                    self._public_btn.pack(side="left")
                 else:
-                    self._addr_label.configure(text=self._public_ip or "")
-                    self._copy_btn.configure(state="normal" if self._public_ip else "disabled")
-                    if not self._public_ip:
-                        self._public_btn.pack(side="left", padx=(12, 0))
-            self._lan_ip = lan_ip() if mode == "Host" else None
-            if self._lan_ip:
-                self._lan_label.configure(text=f"Friend on the same home network: {self._lan_ip}")
-                self._lan_row.pack(anchor="w", pady=(8, 0))
-            else:
-                self._lan_row.pack_forget()
-            if online and net == "Tailscale" and not ts:
+                    self._copy_btn.pack(side="left", padx=(12, 0))
+            if online and net == "Tailscale":
                 self._get_ts.pack(side="left", padx=(0, 18))
             self._hint.configure(text=self._online_hint(mode, net, ts))
             self._update_launch_label()
@@ -1162,18 +1148,19 @@ class Launcher(tk.Tk):
 
     def _online_hint(self, mode, net, ts):
         if mode == "Offline":
-            return "Play on this PC. To play a friend over the internet, pick Host or Join."
+            return "Play on this PC. To play against a friend, pick Host or Join."
         if mode == "Host":
             if net == "Tailscale":
                 first = ("Send your address to your friend, then press Host Game." if ts else
-                         "Install Tailscale and sign in, then share this PC with your friend.")
+                         "Tailscale isn't set up on this PC yet: follow the setup guide below (about 5 minutes).")
+            elif net == "LAN":
+                first = "Send this address to your friend. No router setup needed."
             else:
-                first = (f"Forward TCP {ONLINE_PORT} and UDP 1795 on your router to this PC, then send your "
-                         "public IP to your friend. (The button asks api.ipify.org once; nothing is stored.)")
+                first = "Forward the game's ports on your router first (see How to play online), then send your address."
             return first + "\nIn the game: ONLINE > Quick Match > Search, then press X (Create Game)."
-        first = ("Enter the address your host sent you (100.x.y.z with Tailscale)." if net == "Tailscale"
-                 else "Enter the host's public IP (the host forwards the game's ports), or their 192.168.x.y "
-                 "address if you're on the same home network.")
+        first = {"Tailscale": "Enter the address your host sent you (100.x.y.z with Tailscale).",
+                 "Public": "Enter the address your host sent you (the host forwards the game's ports).",
+                 "LAN": "Enter the host's home-network address (usually 192.168.x.y)."}[net]
         return first + "\nStart after the host. In the game: ONLINE > Quick Match > Search."
 
     def _update_launch_label(self):
@@ -1214,7 +1201,7 @@ class Launcher(tk.Tk):
             if t.is_alive():
                 self.after(200, done)
                 return
-            self._public_btn.configure(state="normal", text="Show my public IP")
+            self._public_btn.configure(state="normal", text="Find my address")
             if "ip" in result:
                 self._public_ip = result["ip"]
             else:
@@ -1229,7 +1216,6 @@ class Launcher(tk.Tk):
         """Env for the chosen online mode; None (after telling the user why) if it can't launch."""
         mode, net, name = self.online_mode.get(), self.online_net.get(), self.online_name.get().strip()
         if mode == "Offline":
-            save_prefs(online_mode=mode)
             return {}
 
         def fail(msg):
@@ -1258,7 +1244,7 @@ class Launcher(tk.Tk):
                 "Online", "Tailscale isn't running on this PC, so your friend can't reach you through it. "
                 "Start anyway?", parent=self):
             return None
-        save_prefs(online_mode=mode, online_net=net, online_name=name, online_peer=self.online_peer.get().strip())
+        save_prefs(online_name=name, online_peer=self.online_peer.get().strip())
         return online_env(mode, name, peer)
 
     def _add_field(self, parent, row, f, first=False):
@@ -1300,18 +1286,13 @@ class Launcher(tk.Tk):
         else:
             w = ttk.Entry(widget_frame, textvariable=var)
             w.pack(side="left", fill="x", expand=True)
-            if f.get("file"):
-                b = ttk.Button(widget_frame, text="Browse...",
-                               command=lambda v=var: self._browse_iso(v))
-                b.pack(side="left", padx=(6, 0))
-                extra.append(b)
 
         # A small info button, with the game's own description on hover.
         info = None
         info_text = INFO.get(key)
         if info_text:
-            info = ttk.Label(parent, text="ⓘ", style="Link.TLabel", cursor="hand2")
-            info.grid(row=row, column=2, sticky="w", padx=(14, 0), pady=(top, 0))
+            info = ttk.Label(widget_frame, text="ⓘ", style="Link.TLabel", cursor="hand2")
+            info.pack(side="left", padx=(10, 0))  # right beside its control
             self._attach_tooltip(info, lambda t=info_text: t)
 
         self.field_widgets[key] = {"widget": w, "label": lbl, "info": info,
@@ -1387,7 +1368,7 @@ class Launcher(tk.Tk):
         self.launch_btn.pack(side="right", padx=(10, 0))
         self._update_launch_label()
         ttk.Button(foot, text="Save", command=self.save).pack(side="right", padx=(0, 8))
-        ttk.Button(foot, text="Reset", command=self.reset).pack(side="right")
+        ttk.Button(foot, text="Reset", command=self.reset).pack(side="left")  # away from Save
 
     # -- data --------------------------------------------------------------
     def load(self):
@@ -1646,18 +1627,6 @@ class Launcher(tk.Tk):
             self.launch_btn.config(state="normal")
         except tk.TclError:
             pass
-
-    def _browse_iso(self, var):
-        try:
-            path = filedialog.askopenfilename(
-                parent=self, title="Select your disc image",
-                initialdir=ROOT,
-                filetypes=[("Disc image", "*.iso"), ("All files", "*")])
-        except Exception as e:
-            self._report_error("Could not open the file picker", e)
-            return
-        if path:
-            var.set(path)
 
 
 def main():

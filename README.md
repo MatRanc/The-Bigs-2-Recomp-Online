@@ -34,74 +34,71 @@ and play a full match, in sync.
 4. Press **Play Offline** to try it. The first start asks for your disc image
    (an `.iso` next to the game is preselected) and copies its files once.
 
+**Requirements:** a GPU with Vulkan support and a current driver. Linux needs
+glibc 2.38 or newer (Ubuntu 24.04, Fedora 39, current Arch or SteamOS).
+Windows needs 64-bit Windows 10 or 11.
+
+### Steam Deck
+
+Use `TheBigs2-SteamDeck-x86_64.AppImage` from the Linux download. It's the same
+game with defaults suited to the Deck: 1x resolution (fills the screen), lighter
+settings, and the keyboard turned off as a controller (Steam Input sends key
+presses).
+
+1. In Desktop Mode, make a folder (e.g. `~/Games/TheBigs2`) and put the
+   AppImage in it, ideally with your `.iso`.
+2. *Add a Non-Steam Game to My Library*, pick the AppImage, switch to Game
+   Mode and play. The setup screen works with the Deck's controls and
+   touchscreen and can browse to an SD card.
+3. Quit with **View + Menu held 2 seconds**, or EXIT GAME on the main menu.
+   **View + Y held a second** opens the settings menu.
+4. On the Deck OLED, set the refresh rate to **60 Hz** in the Quick Access
+   performance menu, or motion judders.
+
+It runs at 30 fps. With `frame_rate = 60` it holds 60 in gameplay and slows
+down in transitions. The first minutes can stutter while shaders compile.
+
+### macOS (experimental)
+
+Build it yourself on an Apple Silicon Mac ([docs/BUILDING.md](docs/BUILDING.md#macos-on-the-mac)).
+Online play with a PC works, but there are graphics glitches and matches run
+slower.
+
 ## Play online with a friend
 
-Both of you need this build and your own copy of the game.
+Both of you need this build and your own copy of the game. Pick how you connect:
 
-1. **Get on the same network with [Tailscale](https://tailscale.com/download)**,
-   a free app that makes two PCs act as if they were on the same home network.
-   Both install it and sign in; the host then shares their PC with the friend
-   (or you both sign in to the same account). Nothing to set up on your router.
-2. **Host:** in the launcher's **Online** tab pick **Host a game**, keep
-   *Tailscale*, and send your friend the address shown under *Your address*
-   (it looks like `100.x.y.z`; **Copy** puts it on the clipboard). Press
-   **Host Game**.
-3. **Friend:** pick **Join a friend**, paste the host's address, press
-   **Join Game** (after the host has started).
-4. **In the game, both:** ONLINE > Quick Match > Search. The host sees
-   *No Game Rooms found*: press **X (Create Game)**. The friend lands in the
-   host's Game Room.
-5. Both press **A (Ready)**. In Team Setup move your controller to a side with
-   the d-pad, pick your team and uniform, then the pitcher and lineup. The host
-   picks the stadium, and the match starts.
+| Where is your friend? | Pick in the launcher | Setup |
+| --- | --- | --- |
+| Same house (same router or Wi-Fi) | Same home network | None |
+| Anywhere else | Over the internet (Tailscale) | [A free app, 5 minutes once](docs/PLAY_ONLINE.md#set-up-tailscale) |
+| Anywhere else, no extra app | Over the internet (port forwarding) | [The host changes router settings](docs/PLAY_ONLINE.md#port-forwarding) |
+
+1. **Host:** in the launcher's **Online** tab pick **Host a game**, send your
+   friend the address shown under *Your address*, and press **Host Game**.
+2. **Friend:** pick **Join a friend**, paste the host's address, and press
+   **Join Game**.
+3. **In the game, both:** ONLINE > Quick Match > Search. The host presses
+   **X (Create Game)**, and the friend lands in the host's Game Room.
 
 ![The launcher's Online tab: Host a game over Tailscale, with the address to send to the friend](docs/images/launcher-online.png)
 
-![The Game Room on both PCs: User1 and User2 in the player slots](docs/images/online-gameroom.jpg)
-
-Player names: up to 8 characters, and the two of you need different names.
-The game runs in lockstep (each side waits for the other), so if one PC
-stutters, both do.
-
-### Without Tailscale
-
-Pick **Public IP** in the Online tab. The host presses **Show my public IP**
-(this asks api.ipify.org once) and sends that address to the friend, and has
-to forward **TCP 51000** and **UDP 1795** on their router to their PC. The
-friend picks **Public IP** too and enters the address. Players on the same
-home network can simply use the host's local address (`192.168.x.y`).
+The full steps, with Tailscale setup: **[Play online](docs/PLAY_ONLINE.md)**.
 
 ### Can't connect?
 
-- The host started first and is waiting in the game (after Search, X).
-- The address is the host's current one: with Tailscale the `100.x.y.z` one,
-  shown in the host's launcher.
-- With Tailscale, both PCs show as connected in the Tailscale app, and the
-  host's PC is shared with the friend.
-- Windows asked whether to let the game use the network: allow it (or allow
-  `thebigs2.exe` in Windows Firewall).
-- Without Tailscale: the router forwards TCP 51000 and UDP 1795 to the host.
-- Two copies on one PC work too, but share the graphics card (~20 fps each).
+See the checklist in [Play online](docs/PLAY_ONLINE.md#cant-connect).
 
 ## Features
 
-- **Online play** against a friend (see above), with a launcher to set it up.
-- **Runs natively** on Windows and Linux (desktop and Steam Deck), macOS
-  experimental.
-- **Sharper picture**: renders at 2x (1440p) by default, with 1x and 3x (4K)
-  available.
-- **Experimental 60 fps** in matches (the original runs matches at 30).
-- **Steam Deck build** with Deck-tuned defaults; works in Game Mode.
-- **Setup screen** on first launch: pick your disc image and it's extracted
-  once. Works with mouse, keyboard, controller and touchscreen.
-- **Settings menu in the game's own style**: open it from **RECOMP SETTINGS**
-  on the main menu, with **F4**, or by holding **Back + Y** on a controller.
-  The launcher edits the same settings.
-- **Main menu additions**: ONLINE, RECOMP SETTINGS and EXIT GAME.
-- **Controller button remapping** and **keyboard controls**.
-- **Portable**: settings, saves, logs and the extracted game live next to the
-  game.
-- Saving and loading work.
+- **Online play** against a friend, with a launcher to set it up.
+- **Sharper picture**: 2x (1440p) by default, up to 4K; experimental 60 fps in
+  matches.
+- **Settings menu in the game's own style** (RECOMP SETTINGS on the main menu,
+  F4, or hold Back + Y); the launcher edits the same settings.
+- **Keyboard controls** and **controller button remapping**.
+- **Portable**: settings, saves and logs live next to the game. Saving and
+  loading work.
 
 ## Key commands
 
@@ -169,63 +166,18 @@ logs/
 If the folder can't be written to, the game uses `~/.config/thebigs2` and
 `~/.local/share/thebigs2` (Linux) or `%APPDATA%\thebigs2` (Windows) instead.
 
-**Requirements:** a GPU with Vulkan support and a current driver. Linux needs
-glibc 2.38 or newer (Ubuntu 24.04, Fedora 39, current Arch or SteamOS).
-Windows needs 64-bit Windows 10 or 11.
-
-## macOS (experimental)
-
-The game builds and runs on Apple Silicon Macs (`packaging/build-macos.sh`, see
-[docs/BUILDING.md](docs/BUILDING.md)), and **online play with a Linux PC works**:
-a Mac joined a Linux host's Game Room and played a match. Known problems:
-
-- Player models are spiked and the bat floats (graphics through MoltenVK/Metal).
-- Matches run slower than on a PC; online, both players run at the Mac's pace.
-- It defaults to 1x resolution and the "host" render path (the PC defaults
-  glitch on Metal).
-
-Fixes welcome; see [docs/ONLINE.md](docs/ONLINE.md) for the technical notes.
-
-## Steam Deck
-
-Use `TheBigs2-SteamDeck-x86_64.AppImage` from the Linux download. It's the same
-game with defaults suited to the Deck: 1x resolution (fills the screen), lighter
-settings, and the keyboard turned off as a controller (Steam Input sends key
-presses).
-
-1. In Desktop Mode, make a folder (e.g. `~/Games/TheBigs2`) and put the
-   AppImage in it, ideally with your `.iso`.
-2. *Add a Non-Steam Game to My Library*, pick the AppImage, switch to Game
-   Mode and play. The setup screen works with the Deck's controls and
-   touchscreen and can browse to an SD card.
-3. Quit with **View + Menu held 2 seconds**, or EXIT GAME on the main menu.
-   **View + Y held a second** opens the settings menu.
-4. On the Deck OLED, set the refresh rate to **60 Hz** in the Quick Access
-   performance menu, or motion judders.
-
-It runs at 30 fps. With `frame_rate = 60` it holds 60 in gameplay and slows
-down in transitions. The first minutes can stutter while shaders compile.
-
 ## Troubleshooting
 
 - After a crash or a black screen, check `logs/`. An old settings file from
   an earlier build can cause trouble; deleting it resets everything.
 - For smooth motion, use a 60 Hz or 120 Hz display mode, or VRR / G-Sync.
-- Online problems: see [Can't connect?](#cant-connect).
+- Online problems: see [Can't connect?](docs/PLAY_ONLINE.md#cant-connect).
 
 ## For developers
 
-- **[docs/BUILDING.md](docs/BUILDING.md)**: build the SDK and the game, package
-  the releases (Linux, Windows cross-build, macOS).
-- **Where the downloads come from:** the launcher apps are built by GitHub
-  Actions from this repo ([workflow](.github/workflows/build-launcher.yml));
-  the game builds can't be (they need game files that are never uploaded), so
-  they're built with the scripts in `packaging/` and attached to the release.
-- **[docs/ONLINE.md](docs/ONLINE.md)**: how the online mode works, the debug
-  flags, and how to test two copies on one PC.
-- The online build needs the SDK fork
-  [MatRanc/rexglue-sdk](https://github.com/MatRanc/rexglue-sdk) (branch
-  `tb2-online`).
+Building, packaging and where the downloads come from:
+[docs/BUILDING.md](docs/BUILDING.md). How the online mode works and how to test
+it: [docs/ONLINE.md](docs/ONLINE.md).
 
 ## Credits
 
