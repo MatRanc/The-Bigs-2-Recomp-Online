@@ -6,8 +6,8 @@ connect:
 | Where is your friend? | Pick in the launcher | Setup |
 | --- | --- | --- |
 | Same house (same router or Wi-Fi) | [Same home network](#same-home-network) | None |
-| Anywhere else | [Over the internet (Tailscale)](#set-up-tailscale) | A free app, 5 minutes once |
-| Anywhere else, no extra app | [Over the internet (port forwarding)](#port-forwarding) | The host changes router settings |
+| Anywhere else | ⭐ **Over the internet (Tailscale)** — recommended | Easy: a free app, 5 minutes once ([how](#set-up-tailscale)) |
+| Anywhere else, no extra app | Over the internet (port forwarding) — *advanced* | Harder: the host changes router settings ([how](#port-forwarding)) |
 
 ## Playing
 

@@ -71,8 +71,8 @@ Both of you need this build and your own copy of the game. Pick how you connect:
 | Where is your friend? | Pick in the launcher | Setup |
 | --- | --- | --- |
 | Same house (same router or Wi-Fi) | Same home network | None |
-| Anywhere else | Over the internet (Tailscale) | [A free app, 5 minutes once](docs/PLAY_ONLINE.md#set-up-tailscale) |
-| Anywhere else, no extra app | Over the internet (port forwarding) | [The host changes router settings](docs/PLAY_ONLINE.md#port-forwarding) |
+| Anywhere else | ⭐ **Over the internet (Tailscale)** — recommended | Easy: a free app, 5 minutes once ([how](docs/PLAY_ONLINE.md#set-up-tailscale)) |
+| Anywhere else, no extra app | Over the internet (port forwarding) — *advanced* | Harder: the host changes router settings ([how](docs/PLAY_ONLINE.md#port-forwarding)) |
 
 1. **Host:** in the launcher's **Online** tab pick **Host a game**, send your
    friend the address shown under *Your address*, and press **Host Game**.
