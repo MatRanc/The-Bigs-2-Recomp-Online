@@ -22,7 +22,7 @@ sudo apt install clang-20 lld-20 ninja-build cmake pkg-config nasm \
   libxkbcommon-dev libwayland-dev wayland-protocols libegl-dev libdrm-dev \
   libgbm-dev libudev-dev libdbus-1-dev libpipewire-0.3-dev libasound2-dev \
   libpulse-dev libvulkan-dev curl cabextract
-git clone --recursive -b fix/stability https://github.com/mdomangue26/rexglue-sdk.git
+git clone --recursive -b tb2-online https://github.com/MatRanc/rexglue-sdk.git
 cd rexglue-sdk
 cmake --preset linux-amd64 -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20
 cmake --build out/build/linux-amd64 --config Release
@@ -38,6 +38,9 @@ package registry points; to use another location, configure the game with
 The SDK above is the port's own fork: the upstream SDK's `development` branch
 at **bd833a2** plus the fixes below, on the branch **`fix/stability`**
 ([mdomangue26/rexglue-sdk](https://github.com/mdomangue26/rexglue-sdk/tree/fix/stability)).
+Online play also needs one more commit on top, on the branch **`tb2-online`**
+([MatRanc/rexglue-sdk](https://github.com/MatRanc/rexglue-sdk/tree/tb2-online);
+see [ONLINE.md](ONLINE.md)); the clone command above uses that branch.
 Use it. The upstream SDK also builds the game, which then runs, but without
 these fixes: use `resolution_scale = 1` and keep `frame_rate` at 30 there.
 
