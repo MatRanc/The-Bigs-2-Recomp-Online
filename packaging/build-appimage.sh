@@ -29,7 +29,7 @@ TOOL_URL="https://github.com/AppImage/appimagetool/releases/download/continuous/
 
 rm -rf "$APPDIR"
 mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/applications" \
-         "$APPDIR/usr/share/icons/hicolor/scalable/apps"
+         "$APPDIR/usr/share/icons/hicolor/512x512/apps"
 
 # Executable + everything it loads from its own folder ($ORIGIN rpath):
 # librexruntime.so, libTracyClient.so and the GPU plugin librexgpu-xenos.so.
@@ -65,9 +65,9 @@ else
 fi
 chmod +x "$APPDIR/AppRun"
 cp "$APPDIR/thebigs2.desktop" "$APPDIR/usr/share/applications/"
-cp "$ROOT/packaging/thebigs2.svg" "$APPDIR/"
-cp "$ROOT/packaging/thebigs2.svg" "$APPDIR/usr/share/icons/hicolor/scalable/apps/"
-ln -sf thebigs2.svg "$APPDIR/.DirIcon"
+cp "$ROOT/assets/thebigs2-icon.png" "$APPDIR/thebigs2.png"
+cp "$ROOT/assets/thebigs2-icon.png" "$APPDIR/usr/share/icons/hicolor/512x512/apps/thebigs2.png"
+ln -sf thebigs2.png "$APPDIR/.DirIcon"
 
 if [ ! -x "$TOOL" ]; then
   echo "Downloading appimagetool..."

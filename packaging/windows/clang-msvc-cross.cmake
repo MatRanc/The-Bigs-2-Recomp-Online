@@ -27,7 +27,16 @@ endif()
 # try_compile projects need it too.
 list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES XWIN_DIR)
 
-set(LLVM_SUFFIX "-20" CACHE STRING "Suffix of the LLVM tool names (clang-20, ...)")
+# Ubuntu ships versioned names (clang-20); Fedora also has plain ones (clang, llvm-rc).
+if(NOT DEFINED LLVM_SUFFIX)
+    find_program(_tb2_clang20 clang-20)
+    if(_tb2_clang20)
+        set(_tb2_suffix "-20")
+    else()
+        set(_tb2_suffix "")
+    endif()
+endif()
+set(LLVM_SUFFIX "${_tb2_suffix}" CACHE STRING "Suffix of the LLVM tool names (clang-20, ...)")
 
 set(_triple x86_64-pc-windows-msvc)
 set(CMAKE_C_COMPILER   clang${LLVM_SUFFIX})

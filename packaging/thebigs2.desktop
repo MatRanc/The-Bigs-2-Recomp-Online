@@ -6,3 +6,4 @@ Exec=thebigs2
 Icon=thebigs2
 Categories=Game;SportsGame;
 Terminal=false
+StartupWMClass=thebigs2

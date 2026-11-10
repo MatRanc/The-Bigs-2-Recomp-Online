@@ -16,6 +16,7 @@
 # Visual C++ runtime DLLs (app-local; see below), but no game data: on first
 # launch it asks for your disc image (.iso).
 set -euo pipefail
+READOBJ=$(command -v llvm-readobj-20 || command -v llvm-readobj)
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="${BUILD_DIR:-$ROOT/out/build/win-amd64-cross}"
@@ -65,7 +66,7 @@ for dll in $VCRT_DLLS; do cp "$VCRT/$dll" "$STAGE/"; done
 
 # Every DLL the binaries import must be in the folder or part of Windows.
 for f in "$STAGE"/*.exe "$STAGE"/*.dll; do
-  llvm-readobj-20 --coff-imports "$f" | sed -n 's/^ *Name: \(.*\.dll\)$/\1/Ip' | while read -r dll; do
+  "$READOBJ" --coff-imports "$f" | sed -n 's/^ *Name: \(.*\.dll\)$/\1/Ip' | while read -r dll; do
     lower=$(echo "$dll" | tr 'A-Z' 'a-z')
     case "$lower" in
       api-ms-win-*|kernel32.dll|user32.dll|gdi32.dll|advapi32.dll|shell32.dll|ole32.dll|\
@@ -76,6 +77,13 @@ for f in "$STAGE"/*.exe "$STAGE"/*.dll; do
     esac
   done
 done
+
+# The launcher (Settings + Online tabs). Runs with Python 3 via the .bat; build-launcher-exe.bat makes an exe.
+cp "$ROOT/thebigs2_gui.py" "$ROOT/packaging/windows/The Bigs 2 Launcher.bat" \
+   "$ROOT/packaging/windows/build-launcher-exe.bat" "$STAGE/"
+mkdir -p "$STAGE/vendor" "$STAGE/assets"
+cp -r "$ROOT/vendor/sv_ttk" "$STAGE/vendor/" && rm -rf "$STAGE/vendor/sv_ttk/__pycache__"
+cp -r "$ROOT/assets/theme-icons" "$ROOT/assets/bigs2-logo-128.png" "$ROOT/assets/bigs2-logo.png" "$STAGE/assets/"
 
 rm -f "$OUT_DIR/$NAME.zip"
 (cd "$OUT_DIR" && zip -qr9 "$NAME.zip" "$NAME")
