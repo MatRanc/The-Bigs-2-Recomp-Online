@@ -151,6 +151,17 @@ If it closes right away, run it from Konsole in Desktop Mode to see the error.
 - After a crash or a black screen, check `logs/`. An old settings file from
   an earlier build can cause trouble; deleting it resets everything.
 
+## Online play
+
+Two players can play a match over the internet with the game's own online mode
+(Xbox Live is gone; this build stands in for it). In the launcher's **Online**
+tab one player picks **Host a game**, the other **Join a friend** and enters the
+host's IP. The easiest network is [Tailscale](https://tailscale.com) (free,
+nothing to forward): both install it, sign in to the same network, and use the
+host's `100.x.y.z` address. Then in the game: Online > Quick Match > Search; the
+host presses X (Create Game) when no rooms are found. How it works and how to
+work on it: [docs/ONLINE.md](docs/ONLINE.md).
+
 ## License
 
 The port's own code is public domain ([Unlicense](LICENSE)). The game itself,
