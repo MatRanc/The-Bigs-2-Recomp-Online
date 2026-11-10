@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Build The Bigs 2 on a Mac (Apple Silicon or Intel). Run this ON the Mac, from a copy of this project folder that
-# has game/default.xex (the build recompiles it). Untested so far: expect to send the first errors back.
+# Build The Bigs 2 on a Mac (experimental; tested on Apple Silicon). Run this ON the Mac, from a copy of this project
+# folder that has game/default.xex (the build recompiles it; to run the dev build, extract the whole disc into game/).
 #
-#   packaging/build-macos.sh          # SDK -> ~/rexsdk-install, game -> out/build/mac-release/thebigs2
+#   packaging/build-macos.sh          # SDK -> ~/rexsdk-install, game -> out/build/mac-release/thebigs2, release zip
+#   JOBS=4 packaging/build-macos.sh   # fewer parallel compiles (default: one per 4 GB of RAM)
 #
-# Needs: Xcode command line tools (xcode-select --install), Homebrew cmake + ninja, git, and Python 3 with Tk for the
-# launcher (brew install python-tk). Downloads the ReXGlue SDK fork with the online-play changes
-# (github.com/MatRanc/rexglue-sdk, branch tb2-online; ~550 MB with submodules).
+# Needs: Xcode command line tools (xcode-select --install), Homebrew cmake + ninja + git + gh (gh auth login: the
+# launcher app is downloaded from this repo's GitHub Actions). Downloads the ReXGlue SDK fork with the online-play
+# changes (github.com/MatRanc/rexglue-sdk, branch tb2-online; ~550 MB with submodules).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

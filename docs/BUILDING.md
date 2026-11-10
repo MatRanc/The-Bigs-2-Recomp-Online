@@ -184,13 +184,23 @@ Visual Studio 2022 and its Clang tools. It hasn't been tested.
 
 ```bash
 xcode-select --install
-brew install cmake ninja python-tk
-packaging/build-macos.sh
+brew install cmake ninja git gh && gh auth login
+packaging/build-macos.sh            # or JOBS=4 packaging/build-macos.sh
 ```
 
 The script clones and builds the SDK fork (branch `tb2-online`) into
 `~/rexsdk-install`, builds the game into `out/build/mac-release/` (needs
-`game/default.xex`, see step 2) and zips it with the launcher. Not tested yet.
+`game/default.xex`, see step 2) and zips it with the launcher app (downloaded
+from this repo's GitHub Actions, hence `gh`) into
+`out/macos/TheBigs2-macos-<arch>.zip`. It runs one compile per 4 GB of RAM:
+the generated files need several GB each, and one per core swapped a Mac to a
+crawl at 60 GB; `JOBS=n` overrides. To run the dev build
+(`out/build/mac-release/thebigs2`), extract the whole disc into `game/` as in
+step 2.
+
+Status: experimental, tested on Apple Silicon. It builds and runs, and online
+play with a Linux PC works, but player models are spiked, the bat floats and
+matches are slow (Metal through MoltenVK); see the README.
 
 ## Project layout
 
