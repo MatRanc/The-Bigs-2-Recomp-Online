@@ -5,7 +5,16 @@ made by recompiling the original Xbox 360 executable to C++ with the
 [ReXGlue SDK](https://github.com/rexglue/rexglue-sdk).
 
 **No game files are included.** You need your own copy of the disc (an `.iso`
-dump). Ready-made builds are on the
+dump).
+
+> **Clean room.** This repo contains no game code, game files or 2K data: no
+> executable (`default.xex`), no disc contents, no recompiled output, no
+> captures or memory dumps. It holds the port's own code, and describes how the
+> game's online mode talks to the other player so people can keep playing a
+> game they own. You need your own copy of the game. *The Bigs 2* is © 2K Sports
+> / Take-Two Interactive; MLB marks are the property of Major League Baseball.
+> The logo used for the icons is a trademark of its owners. Not affiliated with
+> 2K, Take-Two or MLB. Ready-made builds are on the
 **[Releases](https://github.com/mdomangue26/thebigs2/releases)** page; to build
 it yourself, see **[Building](docs/BUILDING.md)**.
 

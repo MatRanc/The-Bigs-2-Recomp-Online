@@ -28,6 +28,7 @@ set(THEBIGS2_SOURCES
     src/renderdoc_capture.cpp
     src/settings.cpp
     src/main_menu_entry.cpp
+    src/online_debug.cpp
     src/settings_menu.cpp
     src/ui_theme.cpp
     src/imgui_gamepad.cpp
@@ -38,6 +39,7 @@ set(THEBIGS2_SOURCES
 
 if(WIN32)
     add_executable(thebigs2 WIN32 ${THEBIGS2_SOURCES} packaging/windows/thebigs2.rc)
+    target_link_libraries(thebigs2 PRIVATE ws2_32)  # online_debug.cpp: own-IP check for the GameConn port swap
 else()
     add_executable(thebigs2 ${THEBIGS2_SOURCES})
 endif()
@@ -84,8 +86,39 @@ if(TB2_RENDER_TRACE)
     target_compile_definitions(thebigs2 PRIVATE TB2_RENDER_TRACE=1)
 endif()
 
+# Function-entry tracing for reverse engineering (TB2_FN_TRACE=1 at run time logs functions run per AutoKey tap).
+option(TB2_FN_TRACE "Build with function entry trace wrappers for the UI range" OFF)
+set(TB2_FN_TRACE_RANGE "82200000-82360000" CACHE STRING "Guest address range (lo-hi hex) wrapped by TB2_FN_TRACE")
+if(TB2_FN_TRACE)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    set(_fn_cpp "${CMAKE_CURRENT_BINARY_DIR}/fn_trace_hooks.cpp")
+    add_custom_command(
+        OUTPUT "${_fn_cpp}"
+        COMMAND Python3::Interpreter "${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_fn_trace.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}/generated/default" "${_fn_cpp}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/src/online_debug.cpp" ${TB2_FN_TRACE_RANGE}
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_fn_trace.py" "${CMAKE_CURRENT_SOURCE_DIR}/src/online_debug.cpp"
+        COMMENT "Generating function trace wrappers" VERBATIM)
+    target_sources(thebigs2 PRIVATE "${_fn_cpp}")
+endif()
+
+# Put the ONLINE entry back on the main menu (the game's own OnlineMenu; online
+# play needs the launcher's Host/Join env, see thebigs2_gui.py online_env()).
+option(TB2_ONLINE_MENU "Add an ONLINE entry that opens the game's online menu" ON)
+if(TB2_ONLINE_MENU)
+    target_compile_definitions(thebigs2 PRIVATE TB2_ONLINE_MENU=1)
+endif()
+
 # GPU emulation is opt-in on the development branch; ship the Xenos plugin.
 rexglue_setup_target(thebigs2 GPU_PLUGINS xenos)
+
+# Online play is lockstep: every machine must compute bit-identical floats. Never fuse a*b+c into one FMA
+# (clang does so by default on arm64, e.g. Apple Silicon); explicit std::fma calls stay correctly rounded.
+foreach(_t thebigs2 thebigs2_recomp)
+    if(TARGET ${_t})
+        target_compile_options(${_t} PRIVATE $<$<CXX_COMPILER_ID:Clang,AppleClang,GNU>:-ffp-contract=off>)
+    endif()
+endforeach()
 
 # Keep the executable loadable on glibc older than the build machine's, e.g.
 # SteamOS (see src/glibc_compat.h), including the recompiled sources.

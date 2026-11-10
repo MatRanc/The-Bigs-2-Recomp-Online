@@ -13,3 +13,17 @@ out/
 build/
 CMakeUserPresets.json
 *.bak
+
+# Local / dev-only (not published)
+*.AppImage
+__pycache__/
+cache/
+logs/
+config/
+ghidra/
+research/
+xenia-netplay/
+callgraph.json
+TheBigs2Launcher.desktop
+tools/ghidra_scripts/
+docs/ONLINE_P2P_HANDOFF.md
