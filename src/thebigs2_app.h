@@ -28,6 +28,7 @@
 #include "first_launch.h"
 #include "frame_stats.h"
 #include "main_menu_entry.h"
+#include "online_debug.h"
 #include "settings.h"
 #include "settings_menu.h"
 #include "ui_theme.h"
@@ -137,6 +138,14 @@ class Thebigs2App : public rex::ReXApp {
     rex::ui::UnregisterBind("bind_settings");
     rex::ui::RegisterBind("bind_settings_menu", "F4", "Settings menu",
                           [] { tb2::ToggleSettingsMenu(); });
+    if (std::getenv("TB2_ONLINE_DEBUG")) {
+      rex::ui::RegisterBind("bind_online_dump", "F11", "Dump online manager",
+                            [] { tb2::DumpOnlineManager(); });
+      rex::ui::RegisterBind("bind_online_signin", "F12", "Nudge sign-in changed",
+                            [] { tb2::NudgeSigninChanged(); });
+      rex::ui::RegisterBind("bind_online_live", "F6", "Nudge Live connection",
+                            [] { tb2::NudgeLiveConnection(); });
+    }
     TB2_RegisterRenderDocCaptureBind();
     TB2_LogRenderTargetPath();
     SetGuestFrameStats(&tb2::GuestFrameStats);

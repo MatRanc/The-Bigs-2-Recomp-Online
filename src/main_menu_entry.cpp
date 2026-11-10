@@ -46,10 +46,19 @@ struct Label {
   uint32_t id;
   std::string_view text;
 };
-constexpr Label kLabels[] = {{99000, "RECOMP SETTINGS"}, {99001, "EXIT GAME"}};
+constexpr Label kLabels[] = {
+    {99000, "RECOMP SETTINGS"},
+    {99001, "EXIT GAME"},
+#if defined(TB2_ONLINE_MENU)
+    {99002, "ONLINE"},
+#endif
+};
 constexpr uint32_t kCommandAction = 7;  // an onSelect="ACT:..." as the handler gets it
 constexpr std::string_view kRecompSettings = "RecompSettings";
 constexpr std::string_view kExitGame = "ExitGame";
+#if defined(TB2_ONLINE_MENU)
+constexpr std::string_view kOnlineMenu = "OnlineMenu";
+#endif
 
 std::function<void()> g_quit;
 
@@ -148,14 +157,32 @@ std::string PatchMainMenu(std::string_view original) {
   const std::string recomp = NewButton(options, "StartButtonRecomp", "StartButton10",
                                        "StartButtonExit", kRecompSettings, "0.61806",
                                        kLabels[0]);
+#if defined(TB2_ONLINE_MENU)
+  // Put an ONLINE entry at the bottom; the game's own OnlineMenu handles it.
+  const std::string online_entry = NewButton(options, "StartButtonOnline", "StartButtonExit",
+                                             "StartButton1", kOnlineMenu, "0.71528",
+                                             kLabels[2]);
+  const char* exit_down = "StartButtonOnline";
+  const char* first_up = "StartButtonOnline";
+#else
+  const std::string online_entry;
+  const char* exit_down = "StartButton1";
+  const char* first_up = "StartButtonExit";
+#endif
   const std::string exit = NewButton(options, "StartButtonExit", "StartButtonRecomp",
-                                     "StartButton1", kExitGame, "0.66667", kLabels[1]);
-  if (recomp.empty() || exit.empty()) return {};
+                                     exit_down, kExitGame, "0.66667", kLabels[1]);
+  if (recomp.empty() || exit.empty()
+#if defined(TB2_ONLINE_MENU)
+      || online_entry.empty()
+#endif
+  )
+    return {};
   const std::string old_first = first, old_extra = extra, old_options = options,
                     old_guide = guide;
   // OPTIONS and STRATEGY GUIDE move up a row (STRATEGY GUIDE's own Y is off,
   // its children move it a row down).
-  if (!ReplaceOnce(first, "onUp=\"FOC:StartButton10\"", "onUp=\"FOC:StartButtonExit\"") ||
+  if (!ReplaceOnce(first, "onUp=\"FOC:StartButton10\"",
+                   "onUp=\"FOC:" + std::string(first_up) + "\"") ||
       !ReplaceOnce(extra, "onDown=\"FOC:StartButton9\"", "onDown=\"FOC:StartButton8\"") ||
       !ReplaceOnce(options, "onUp=\"FOC:StartButton9\"", "onUp=\"FOC:StartButton11\"") ||
       !SetY(options, "0.52084") ||
@@ -164,7 +191,7 @@ std::string PatchMainMenu(std::string_view original) {
     return {};
   if (!ReplaceOnce(text, old_first, first) || !ReplaceOnce(text, old_extra, extra) ||
       !ReplaceOnce(text, online, "") || !ReplaceOnce(text, old_options, options) ||
-      !ReplaceOnce(text, old_guide, guide + recomp + exit))
+      !ReplaceOnce(text, old_guide, guide + recomp + exit + online_entry))
     return {};
   if (text.size() > original.size()) return {};
   text.append(original.size() - text.size(), '\n');
