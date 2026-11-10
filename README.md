@@ -1,84 +1,87 @@
-# The Bigs 2 Online — PC port with online play
+# The Bigs 2 Online
 
 Play *The Bigs 2* (Xbox 360, 2K Sports, 2009) **online against a friend** again,
 on Windows, Linux and macOS.
 
-This is a fork of [The Bigs 2 Recompiled](https://github.com/mdomangue26/The-Bigs-2-Recompiled)
-by **Michael (mdomangue26)**, a native PC port made by recompiling the Xbox 360
-game with the [ReXGlue SDK](https://github.com/rexglue/rexglue-sdk). This fork
-brings back the game's **online mode**: the original peer-to-peer netcode,
-with a small stand-in for the Xbox Live service that shut down. Two players meet
-in the Game Room, pick their teams and play a full match, in sync.
+Based on [The Bigs 2 Recompiled](https://github.com/mdomangue26/The-Bigs-2-Recompiled)
+by Michael (mdomangue26), a native PC port of the game. This fork brings back
+the game's own online mode: two players meet in the Game Room, pick their teams
+and play a full match, in sync.
 
-![Two copies of the game in one online match: the host (left) and the joiner (right) at the same pitch, same count](docs/images/online-match.jpg)
+![An online match on two PCs: the host (left) and the joiner (right) at the same pitch, same count](docs/images/online-match.jpg)
 
-> **Clean room.** This repo contains no game code, game files or 2K data: no
-> executable (`default.xex`), no disc contents, no recompiled output, no
-> captures or memory dumps. It holds the port's own code and describes how the
-> game's online mode talks to the other player, so people can keep playing a
-> game they own. **You need your own copy of the game** (a disc image, `.iso`).
-> *The Bigs 2* is © 2K Sports / Take-Two Interactive; MLB marks are the property
-> of Major League Baseball. The logo used for the icons is a trademark of its
-> owners. Not affiliated with 2K, Take-Two or MLB.
+> **You need your own copy of the game** (a disc image, `.iso`). This repo
+> contains no game code or game files; see [Legal](#legal).
 
-## Download and play
+## Download and install
 
-1. Download the file for your system from the
-   **[Releases](https://github.com/MatRanc/The-Bigs-2-Recompiled/releases)** page:
+1. Download the file for your system from
+   **[Releases](https://github.com/MatRanc/The-Bigs-2-Recomp-Online/releases)**:
 
    | System | File |
    |---|---|
    | Windows 10/11 (64-bit) | `TheBigs2-windows-x64.zip` |
    | Linux (and Steam Deck) | `TheBigs2-linux-x64.tar.gz` |
-   | macOS | `TheBigs2-macos-arm64.zip` *(experimental, when available)* |
+   | macOS | `TheBigs2-macos-arm64.zip` *(coming soon)* |
 
 2. Unpack it into a folder of its own and put your `.iso` next to it.
-3. Start **The Bigs 2 Launcher** in that folder. Nothing else to install.
-   - **Windows:** `The Bigs 2 Launcher.exe`. Windows may warn about an
-     unrecognised app the first time: *More info* > *Run anyway*.
-   - **Linux:** `The Bigs 2 Launcher` (double-click, or run it from a terminal).
-   - **macOS:** `The Bigs 2 Launcher.app`. The app isn't signed, so the first
-     time right-click it > *Open*, or run `xattr -dr com.apple.quarantine .` in
-     the folder.
-4. Press **Launch Game**. The first start asks for your disc image (an `.iso`
-   next to the game is preselected), copies its files once, and the game starts.
-
-You can also start the game directly (`thebigs2.exe`, the AppImage, or
-`thebigs2` on macOS) to play offline.
+3. Open **The Bigs 2 Launcher** in that folder. Nothing else to install.
+   - **Windows:** `The Bigs 2 Launcher.exe`. If Windows warns about an
+     unrecognised app: *More info* > *Run anyway*.
+   - **Linux:** `The Bigs 2 Launcher`.
+   - **macOS:** `The Bigs 2 Launcher.app`. It isn't signed: the first time,
+     right-click it > *Open*.
+4. Press **Play Offline** to try it. The first start asks for your disc image
+   (an `.iso` next to the game is preselected) and copies its files once.
 
 ## Play online with a friend
 
-Both players need this build and their own copy of the game.
+Both of you need this build and your own copy of the game.
 
-![The launcher's Online tab: Host a game or Join a friend, player name, the host's IP and your own IPs](docs/images/launcher-online.png)
-
-1. **Get on the same network.** The easiest way is [Tailscale](https://tailscale.com)
-   (free): both install it and join the same tailnet (the host can share their
-   machine with the friend). Nothing to set up on your router.
-2. **Host:** in the launcher's **Online** tab pick **Host a game**, type a
-   player name, and send your friend your IP from *Your IPs* (the `100.x.y.z`
-   one with Tailscale). Press **Launch Game**.
-3. **Friend:** pick **Join a friend**, type a player name and the host's IP,
-   press **Launch Game**.
-4. **In the game, both:** ONLINE > Quick Match > Search.
-   - The host sees *No Game Rooms found*: press **X (Create Game)**.
-   - The friend lands in the host's **Game Room**.
+1. **Get on the same network with [Tailscale](https://tailscale.com/download)**,
+   a free app that makes two PCs act as if they were on the same home network.
+   Both install it and sign in; the host then shares their PC with the friend
+   (or you both sign in to the same account). Nothing to set up on your router.
+2. **Host:** in the launcher's **Online** tab pick **Host a game**, keep
+   *Tailscale*, and send your friend the address shown under *Your address*
+   (it looks like `100.x.y.z`; **Copy** puts it on the clipboard). Press
+   **Host Game**.
+3. **Friend:** pick **Join a friend**, paste the host's address, press
+   **Join Game** (after the host has started).
+4. **In the game, both:** ONLINE > Quick Match > Search. The host sees
+   *No Game Rooms found*: press **X (Create Game)**. The friend lands in the
+   host's Game Room.
 5. Both press **A (Ready)**. In Team Setup move your controller to a side with
    the d-pad, pick your team and uniform, then the pitcher and lineup. The host
    picks the stadium, and the match starts.
 
-![The Game Room on both machines: User1 and User2 in the player slots](docs/images/online-gameroom.jpg)
+![The launcher's Online tab: Host a game over Tailscale, with the address to send to the friend](docs/images/launcher-online.png)
 
-![Game Setup: only the host can pick the stadium; the joiner sees the same screen](docs/images/online-gamesetup.jpg)
+![The Game Room on both PCs: User1 and User2 in the player slots](docs/images/online-gameroom.jpg)
 
-**Good to know**
-- Player names: up to 8 characters, and the two players need different names.
-- Windows asks whether to allow the game on the network the first time: allow
-  it. Without Tailscale the host has to forward **TCP 51000** and **UDP 1795**.
-- The game runs in lockstep: both sides wait for each other, so if one PC
-  stutters, both do.
-- Testing on one PC with two copies works too, but they share the graphics card
-  (expect ~20 fps each).
+Player names: up to 8 characters, and the two of you need different names.
+The game runs in lockstep (each side waits for the other), so if one PC
+stutters, both do.
+
+### Without Tailscale
+
+Pick **Public IP** in the Online tab. The host presses **Show my public IP**
+(this asks api.ipify.org once) and sends that address to the friend, and has
+to forward **TCP 51000** and **UDP 1795** on their router to their PC. The
+friend picks **Public IP** too and enters the address. Players on the same
+home network can simply use the host's local address (`192.168.x.y`).
+
+### Can't connect?
+
+- The host started first and is waiting in the game (after Search, X).
+- The address is the host's current one: with Tailscale the `100.x.y.z` one,
+  shown in the host's launcher.
+- With Tailscale, both PCs show as connected in the Tailscale app, and the
+  host's PC is shared with the friend.
+- Windows asked whether to let the game use the network: allow it (or allow
+  `thebigs2.exe` in Windows Firewall).
+- Without Tailscale: the router forwards TCP 51000 and UDP 1795 to the host.
+- Two copies on one PC work too, but share the graphics card (~20 fps each).
 
 ## Features
 
@@ -195,9 +198,7 @@ down in transitions. The first minutes can stutter while shaders compile.
 - After a crash or a black screen, check `logs/`. An old settings file from
   an earlier build can cause trouble; deleting it resets everything.
 - For smooth motion, use a 60 Hz or 120 Hz display mode, or VRR / G-Sync.
-- Online: if the friend never reaches the Game Room, check the host's IP, that
-  both are on Tailscale (or that the ports are forwarded), and that Windows was
-  allowed to let the game through its firewall.
+- Online problems: see [Can't connect?](#cant-connect).
 
 ## For developers
 
@@ -221,6 +222,16 @@ down in transitions. The first minutes can stutter while shaders compile.
   contributors.
 - [sv-ttk](https://github.com/rdbende/Sun-Valley-ttk-theme) for the launcher's
   theme (MIT).
+
+## Legal
+
+This repo contains no game code, game files or 2K data: no executable
+(`default.xex`), no disc contents, no recompiled output, no captures or memory
+dumps. It holds the port's own code and describes how the game's online mode
+talks to the other player, so people can keep playing a game they own. You need
+your own copy of the game. *The Bigs 2* is © 2K Sports / Take-Two Interactive;
+MLB marks are the property of Major League Baseball. The logo used for the
+icons is a trademark of its owners. Not affiliated with 2K, Take-Two or MLB.
 
 ## License
 

@@ -2,10 +2,10 @@
 # Build the Linux and Windows release files with the stand-alone launcher and upload them to a GitHub release.
 #   packaging/release.sh v1.1-online.2          # creates the release (pre-release) if it doesn't exist yet
 # The macOS zip is built on a Mac (packaging/build-macos.sh) and uploaded with:
-#   gh release upload <tag> out/macos/TheBigs2-macos-arm64.zip -R MatRanc/The-Bigs-2-Recompiled --clobber
+#   gh release upload <tag> out/macos/TheBigs2-macos-arm64.zip -R MatRanc/The-Bigs-2-Recomp-Online --clobber
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-REPO="${REPO:-MatRanc/The-Bigs-2-Recompiled}"
+REPO="${REPO:-MatRanc/The-Bigs-2-Recomp-Online}"
 TAG="${1:?usage: packaging/release.sh <tag>}"
 "$ROOT/packaging/fetch-launcher.sh"
 "$ROOT/packaging/build-linux.sh"

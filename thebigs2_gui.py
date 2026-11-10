@@ -10,8 +10,12 @@ Test: ./thebigs2_gui.py --check
 
 import json
 import os
+import random
 import re
 import socket
+import threading
+import urllib.request
+import webbrowser
 import subprocess
 import sys
 import tkinter as tk
@@ -210,11 +214,47 @@ def local_ips():
     ips += _try_run(["tailscale", "ip", "-4"]).split()
     if sys.platform == "darwin":  # the Mac app's CLI is not on PATH by default
         ips += _try_run(["/Applications/Tailscale.app/Contents/MacOS/Tailscale", "ip", "-4"]).split()
+    elif os.name == "nt":
+        exe = os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "Tailscale", "tailscale.exe")
+        if os.path.isfile(exe):
+            ips += _try_run([exe, "ip", "-4"]).split()
     seen = []
     for ip in ips:
         if ip and not ip.startswith("127.") and ip not in seen:
             seen.append(ip)
     return sorted(seen, key=lambda ip: not ip.startswith("100."))
+
+TAILSCALE_URL = "https://tailscale.com/download"
+GUIDE_URL = "https://github.com/MatRanc/The-Bigs-2-Recomp-Online#play-online-with-a-friend"
+HELP_URL = "https://github.com/MatRanc/The-Bigs-2-Recomp-Online#cant-connect"
+PUBLIC_IP_URL = "https://api.ipify.org"
+NET_MODES = ("Tailscale", "Public")
+
+
+def is_tailscale_ip(ip):
+    """Tailscale hands out addresses from 100.64.0.0/10."""
+    try:
+        a, b = (int(x) for x in ip.split(".")[:2])
+        return a == 100 and 64 <= b <= 127
+    except ValueError:
+        return False
+
+
+def tailscale_ip():
+    """This machine's Tailscale address, or None when Tailscale isn't running here."""
+    return next((ip for ip in local_ips() if is_tailscale_ip(ip)), None)
+
+
+def public_ip():
+    """This network's public address, from an IP-echo service (only called when the user asks)."""
+    with urllib.request.urlopen(PUBLIC_IP_URL, timeout=6) as r:
+        ip = r.read(64).decode("ascii", "replace").strip()
+    socket.inet_aton(ip)  # raises on anything that isn't an IPv4 address
+    return ip
+
+
+def default_player_name():
+    return f"Player{random.randint(10, 99)}"
 
 
 class AlreadyRunning(Exception):
@@ -775,6 +815,9 @@ class Launcher(tk.Tk):
                 ("Hint.TLabel", "Link.TLabel", "Running.TLabel",
                  "Disabled.TLabel", "DisabledHint.TLabel"), palette):
             style.configure(name, foreground=color)
+            # sv-ttk colours labels through a state map, which beats a plain configure.
+            style.map(name, foreground=[("!disabled", color)])
+        self._palette = palette
 
         # Drop the dotted focus ring drawn around a clicked tab.
         try:
@@ -949,8 +992,7 @@ class Launcher(tk.Tk):
                                         padding=(6, 3), command=self.cycle_theme)
         self.theme_btn.pack(side="right", padx=(14, 0), pady=(2, 0))
         self._attach_tooltip(self.theme_btn, self._theme_tooltip)
-        self.path_label = ttk.Label(bar, text="", style="Hint.TLabel")
-        self.path_label.pack(side="right", anchor="e", pady=(6, 0))
+        self.path_label = ttk.Label(bar, text="", style="Hint.TLabel")  # not shown: a file path means nothing to players
         ttk.Separator(self).pack(fill="x", padx=28, pady=(16, 0))
 
     def _build_tabs(self):
@@ -966,7 +1008,11 @@ class Launcher(tk.Tk):
             row = 0
             for i, f in enumerate(fields):
                 row = self._add_field(body, row, f, first=(i == 0))
-        self._build_online_tab()
+            if name == "Game":
+                ttk.Label(body, text="The game asks for your disc image the first time it starts; "
+                          "you only need this to point it at a different one.", style="Hint.TLabel",
+                          wraplength=560, justify="left").grid(row=row, column=1, sticky="w", pady=(10, 0))
+                self._build_online_tab()  # second tab
         # Re-evaluate which settings apply whenever a value changes.
         for var in self.vars.values():
             var.trace_add("write", lambda *_: self._update_gates())
@@ -974,81 +1020,215 @@ class Launcher(tk.Tk):
 
     def _build_online_tab(self):
         prefs = load_prefs()
-        mode = prefs.get("online_mode", "Offline")
+        mode, net = prefs.get("online_mode", "Offline"), prefs.get("online_net", "Tailscale")
         self.online_mode = tk.StringVar(value=mode if mode in ONLINE_MODES else "Offline")
-        self.online_name = tk.StringVar(value=prefs.get("online_name", ""))
+        self.online_net = tk.StringVar(value=net if net in NET_MODES else "Tailscale")
+        self.online_name = tk.StringVar(value=prefs.get("online_name") or default_player_name())
         self.online_peer = tk.StringVar(value=prefs.get("online_peer", ""))
+        self._public_ip = None
         scroll = ScrollFrame(self.notebook)
         self._scrolls.append(scroll)
         self.notebook.add(scroll, text="Online")
+        self.online_tab = scroll
         body = ttk.Frame(scroll.inner, padding=(28, 22, 28, 30))
         body.pack(fill="both", expand=True)
         body.columnconfigure(1, weight=1)
+        body.columnconfigure(0, minsize=150)  # keep the layout steady when rows hide
+        pad = dict(padx=(0, 26), pady=(16, 0))
 
-        ttk.Label(body, text="Play as").grid(row=0, column=0, sticky="e", padx=(0, 26))
-        modes = ttk.Frame(body)
-        modes.grid(row=0, column=1, sticky="w")
-        for m, text in (("Offline", "Offline"), ("Host", "Host a game"), ("Join", "Join a friend")):
-            ttk.Radiobutton(modes, text=text, value=m, variable=self.online_mode).pack(
-                side="left", padx=(0, 18))
+        def label(row, text):
+            lbl = ttk.Label(body, text=text)
+            lbl.grid(row=row, column=0, sticky="e", **pad)
+            return lbl
 
-        ttk.Label(body, text="Player name").grid(row=1, column=0, sticky="e", padx=(0, 26), pady=(16, 0))
-        self.online_name_entry = ttk.Entry(body, textvariable=self.online_name, width=14)
-        self.online_name_entry.grid(row=1, column=1, sticky="w", pady=(16, 0))
+        def radios(row, var, choices):
+            f = ttk.Frame(body)
+            f.grid(row=row, column=1, sticky="w", pady=pad["pady"])
+            for value, text in choices:
+                ttk.Radiobutton(f, text=text, value=value, variable=var).pack(side="left", padx=(0, 18))
+            return f
 
-        ttk.Label(body, text="Host's IP").grid(row=2, column=0, sticky="e", padx=(0, 26), pady=(16, 0))
-        self.online_peer_entry = ttk.Entry(body, textvariable=self.online_peer, width=24)
-        self.online_peer_entry.grid(row=2, column=1, sticky="w", pady=(16, 0))
+        self._links = []
+        self._link_font = tkfont.Font(font=ttk.Style(self).lookup("TLabel", "font") or "TkDefaultFont")
+        self._link_font.configure(underline=True)
 
-        ttk.Label(body, text="Your IPs").grid(row=3, column=0, sticky="ne", padx=(0, 26), pady=(16, 0))
-        ips = local_ips()
-        ip_row = ttk.Frame(body)
-        ip_row.grid(row=3, column=1, sticky="w", pady=(16, 0))
-        ttk.Label(ip_row, text="   ".join(ips) or "(none found)").pack(side="left")
-        if ips:
-            ttk.Button(ip_row, text="Copy", padding=(6, 1),
-                       command=lambda: (self.clipboard_clear(), self.clipboard_append(ips[0]))).pack(
-                side="left", padx=(12, 0))
+        def link(parent, text, url):
+            w = ttk.Label(parent, text=text, style="Link.TLabel", cursor="hand2",
+                          foreground=self._field_colors()[2], font=self._link_font)
+            w.bind("<Button-1>", lambda _e: webbrowser.open(url))
+            self._links.append(w)
+            return w
 
-        help_text = (
-            "Host: pick 'Host a game', send your friend one of your IPs (the 100.x one if you both use "
-            "Tailscale), press Launch Game, then in the game: Online > Quick Match > Search. When it says "
-            "'No Game Rooms found', press X (Create Game).\n\n"
-            "Join: pick 'Join a friend', enter the host's IP, press Launch Game, then: Online > Quick Match > "
-            "Search. You land in the host's Game Room.\n\n"
-            "In the Game Room both press A (Ready). Then pick sides in Team Setup (d-pad left/right), your "
-            "team, pitcher and lineup; the host picks the stadium.\n\n"
-            f"Network: the host must be reachable on TCP {ONLINE_PORT} and UDP 1795. On the same Tailscale "
-            "network nothing else is needed; over the internet without Tailscale the host forwards both ports. "
-            f"Player names: up to {NAME_MAX} characters, and the two players need different names.")
-        ttk.Label(body, text=help_text, style="Hint.TLabel", wraplength=560, justify="left").grid(
-            row=4, column=0, columnspan=2, sticky="w", pady=(24, 0))
+        label(0, "Play")
+        radios(0, self.online_mode, (("Offline", "Offline"), ("Host", "Host a game"), ("Join", "Join a friend")))
+        rows = {}
+        rows["net"] = (label(1, "Connect with"),
+                       radios(1, self.online_net, (("Tailscale", "Tailscale (recommended)"),
+                                                   ("Public", "Public IP"))))
+        name_row = ttk.Frame(body)
+        name_row.grid(row=2, column=1, sticky="w", pady=pad["pady"])
+        ttk.Entry(name_row, textvariable=self.online_name, width=12).pack(side="left")
+        ttk.Label(name_row, text=f"max {NAME_MAX} characters, different from your friend's",
+                  style="Hint.TLabel").pack(side="left", padx=(10, 0))
+        rows["name"] = (label(2, "Player name"), name_row)
+
+        # Host: this machine's address to send to the friend.
+        addr_row = ttk.Frame(body)
+        addr_row.grid(row=3, column=1, sticky="w", pady=pad["pady"])
+        self._addr_label = ttk.Label(addr_row, text="")
+        self._addr_label.pack(side="left")
+        self._copy_btn = ttk.Button(addr_row, text="Copy", padding=(6, 1), command=self._copy_address)
+        self._copy_btn.pack(side="left", padx=(12, 0))
+        self._public_btn = ttk.Button(addr_row, text="Show my public IP", padding=(6, 1),
+                                      command=self._fetch_public_ip)
+        rows["addr"] = (label(3, "Your address"), addr_row)
+
+        # Join: the host's address.
+        peer_row = ttk.Frame(body)
+        peer_row.grid(row=4, column=1, sticky="w", pady=pad["pady"])
+        ttk.Entry(peer_row, textvariable=self.online_peer, width=20).pack(side="left")
+        ttk.Button(peer_row, text="Paste", padding=(6, 1), command=self._paste_peer).pack(side="left", padx=(8, 0))
+        rows["peer"] = (label(4, "Host's address"), peer_row)
+
+        # One or two lines of help for the current choice, plus links.
+        self._hint = ttk.Label(body, text="", style="Hint.TLabel", wraplength=540, justify="left")
+        self._hint.grid(row=5, column=1, sticky="w", pady=(18, 0))
+        links = ttk.Frame(body)
+        links.grid(row=6, column=1, sticky="w", pady=(10, 0))
+        self._get_ts = link(links, "Get Tailscale", TAILSCALE_URL)
+        link(links, "How to play online", GUIDE_URL).pack(side="left", padx=(0, 18))
+        link(links, "Can't connect?", HELP_URL).pack(side="left", padx=(0, 18))
+
+        def show(key, on):
+            for w in rows[key]:
+                w.grid() if on else w.grid_remove()
 
         def gate(*_):
-            online = self.online_mode.get() != "Offline"
-            self.online_name_entry.configure(state="normal" if online else "disabled")
-            self.online_peer_entry.configure(state="normal" if self.online_mode.get() == "Join" else "disabled")
+            mode, net = self.online_mode.get(), self.online_net.get()
+            online = mode != "Offline"
+            show("net", online)
+            show("name", online)
+            show("addr", mode == "Host")
+            show("peer", mode == "Join")
+            ts = tailscale_ip() if online and net == "Tailscale" else None
+            self._get_ts.pack_forget()
+            if mode == "Host":
+                self._public_btn.pack_forget()
+                self._copy_btn.pack_forget()
+                if net == "Tailscale" or self._public_ip:
+                    self._copy_btn.pack(side="left", padx=(12, 0))
+                if net == "Tailscale":
+                    self._addr_label.configure(text=ts or "Tailscale isn't running on this PC")
+                    self._copy_btn.configure(state="normal" if ts else "disabled")
+                else:
+                    self._addr_label.configure(text=self._public_ip or "")
+                    self._copy_btn.configure(state="normal" if self._public_ip else "disabled")
+                    if not self._public_ip:
+                        self._public_btn.pack(side="left", padx=(12, 0))
+            if online and net == "Tailscale" and not ts:
+                self._get_ts.pack(side="left", padx=(0, 18))
+            self._hint.configure(text=self._online_hint(mode, net, ts))
+            self._update_launch_label()
+
         self.online_mode.trace_add("write", gate)
+        self.online_net.trace_add("write", gate)
+        self._online_gate = gate
         gate()
+
+    def _online_hint(self, mode, net, ts):
+        if mode == "Offline":
+            return "Play on this PC. To play a friend over the internet, pick Host or Join."
+        if mode == "Host":
+            if net == "Tailscale":
+                first = ("Send your address to your friend, then press Host Game." if ts else
+                         "Install Tailscale and sign in, then share this PC with your friend.")
+            else:
+                first = (f"Forward TCP {ONLINE_PORT} and UDP 1795 on your router to this PC, then send your "
+                         "public IP to your friend. (The button asks api.ipify.org once; nothing is stored.)")
+            return first + "\nIn the game: ONLINE > Quick Match > Search, then press X (Create Game)."
+        first = ("Enter the address your host sent you (100.x.y.z with Tailscale)." if net == "Tailscale"
+                 else "Enter the host's public IP; the host has to forward the game's ports.")
+        return first + "\nStart after the host. In the game: ONLINE > Quick Match > Search."
+
+    def _update_launch_label(self):
+        btn = getattr(self, "launch_btn", None)
+        if btn is not None:
+            btn.configure(text={"Host": "Host Game", "Join": "Join Game"}.get(self.online_mode.get(), "Play Offline"))
+
+    def _copy_address(self):
+        text = self._addr_label.cget("text")
+        if not text or " " in text:
+            return
+        self.clipboard_clear()
+        self.clipboard_append(text)
+        self._copy_btn.configure(text="Copied!")
+        self.after(1500, lambda: self._copy_btn.configure(text="Copy"))
+
+    def _paste_peer(self):
+        try:
+            self.online_peer.set(self.clipboard_get().strip())
+        except tk.TclError:
+            pass
+
+    def _fetch_public_ip(self):
+        self._public_btn.configure(state="disabled", text="Asking...")
+        result = {}
+
+        def work():
+            try:
+                result["ip"] = public_ip()
+            except Exception as e:  # offline, blocked, ...
+                result["err"] = str(e)
+
+        def done():
+            if t.is_alive():
+                self.after(200, done)
+                return
+            self._public_btn.configure(state="normal", text="Show my public IP")
+            if "ip" in result:
+                self._public_ip = result["ip"]
+            else:
+                messagebox.showerror("Public IP", "Could not look up your public IP:\n" + result["err"], parent=self)
+            self._online_gate()
+
+        t = threading.Thread(target=work, daemon=True)
+        t.start()
+        self.after(200, done)
 
     def _online_launch_env(self):
         """Env for the chosen online mode; None (after telling the user why) if it can't launch."""
-        mode, name = self.online_mode.get(), self.online_name.get().strip()
+        mode, net, name = self.online_mode.get(), self.online_net.get(), self.online_name.get().strip()
         if mode == "Offline":
             save_prefs(online_mode=mode)
             return {}
-        err = check_name(name)
-        peer = ""
-        if not err and mode == "Join":
-            try:
-                peer = resolve_peer(self.online_peer.get())
-            except ValueError as e:
-                err = str(e)
-        if err:
-            messagebox.showerror("Online settings", err, parent=self)
-            self.notebook.select(len(self.notebook.tabs()) - 1)
+
+        def fail(msg):
+            messagebox.showerror("Online", msg, parent=self)
+            self.notebook.select(self.online_tab)
             return None
-        save_prefs(online_mode=mode, online_name=name, online_peer=self.online_peer.get().strip())
+
+        err = check_name(name)
+        if err:
+            return fail(err)
+        peer = ""
+        if mode == "Join":
+            raw = self.online_peer.get().strip()
+            if not raw:
+                return fail("Enter the host's address (ask your host for it).")
+            try:
+                peer = resolve_peer(raw)
+            except ValueError:
+                return fail(f"'{raw}' doesn't look like an address. Ask your host for theirs: with Tailscale it "
+                            "looks like 100.x.y.z.")
+            if net == "Tailscale" and not is_tailscale_ip(peer) and not messagebox.askyesno(
+                    "Online", f"{peer} isn't a Tailscale address (those look like 100.x.y.z). Join anyway?",
+                    parent=self):
+                return None
+        if net == "Tailscale" and not tailscale_ip() and not messagebox.askyesno(
+                "Online", "Tailscale isn't running on this PC, so your friend can't reach you through it. "
+                "Start anyway?", parent=self):
+            return None
+        save_prefs(online_mode=mode, online_net=net, online_name=name, online_peer=self.online_peer.get().strip())
         return online_env(mode, name, peer)
 
     def _add_field(self, parent, row, f, first=False):
@@ -1153,6 +1333,20 @@ class Launcher(tk.Tk):
             pass  # widgets are being torn down
         except Exception as e:
             self._log_error(f"Could not update enabled settings: {e}")
+        self._recolor_online()
+
+    def _recolor_online(self):
+        """sv-ttk repaints every label on a theme change; put the hint/link colours back."""
+        palette = getattr(self, "_palette", None)
+        if not palette:
+            return
+        try:
+            for w in getattr(self, "_links", ()):
+                w.configure(foreground=palette[1])
+            if hasattr(self, "_hint"):
+                self._hint.configure(foreground=palette[0])
+        except tk.TclError:
+            pass
 
     def _build_footer(self):
         ttk.Separator(self).pack(fill="x", padx=28, pady=(6, 0))
@@ -1161,6 +1355,7 @@ class Launcher(tk.Tk):
         self.launch_btn = ttk.Button(foot, text="Launch Game", style="Accent.TButton",
                                      command=self.launch)
         self.launch_btn.pack(side="right", padx=(10, 0))
+        self._update_launch_label()
         ttk.Button(foot, text="Save", command=self.save).pack(side="right", padx=(0, 8))
         ttk.Button(foot, text="Reset", command=self.reset).pack(side="right")
 

@@ -3,7 +3,7 @@
 #   packaging/fetch-launcher.sh [run-id]     # default: the latest successful run on the online branch
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-REPO="${REPO:-MatRanc/The-Bigs-2-Recompiled}"
+REPO="${REPO:-MatRanc/The-Bigs-2-Recomp-Online}"
 RUN="${1:-$(gh run list -R "$REPO" --workflow build-launcher.yml --branch online --status success --limit 1 \
   --json databaseId -q '.[0].databaseId')}"
 [ -n "$RUN" ] || { echo "No successful launcher build found; run the 'Build launcher' workflow first." >&2; exit 1; }
