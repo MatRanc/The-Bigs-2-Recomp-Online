@@ -1,6 +1,6 @@
 # The Bigs 2 Online
 
-Play *The Bigs 2* (Xbox 360, 2K Sports, 2009) **online against a friend** again,
+Play *The Bigs 2* (Xbox 360, 2K Sports, 2009) online against a friend again,
 on Windows and Linux, and (experimental) macOS.
 
 Based on [The Bigs 2 Recompiled](https://github.com/mdomangue26/The-Bigs-2-Recompiled)
@@ -31,7 +31,7 @@ and play a full match, in sync.
    - **Linux:** `The Bigs 2 Launcher`.
    - **macOS:** `The Bigs 2 Launcher.app`. It isn't signed: the first time,
      right-click it > *Open*.
-4. Press **Play Offline** to try it. The first start asks for your disc image
+4. Press *Play Offline* to try it. The first start asks for your disc image
    (an `.iso` next to the game is preselected) and copies its files once.
 
 **Requirements:** a GPU with Vulkan support and a current driver. Linux needs
@@ -51,7 +51,7 @@ presses).
    Mode and play. The setup screen works with the Deck's controls and
    touchscreen and can browse to an SD card.
 3. Quit with **View + Menu held 2 seconds**, or EXIT GAME on the main menu.
-   **View + Y held a second** opens the settings menu.
+   View + Y held a second opens the settings menu.
 4. On the Deck OLED, set the refresh rate to **60 Hz** in the Quick Access
    performance menu, or motion judders.
 
@@ -74,12 +74,12 @@ Both of you need this build and your own copy of the game. Pick how you connect:
 | Anywhere else | ⭐ **Over the internet (Tailscale)** — recommended | Easy: a free app, 5 minutes once ([how](docs/PLAY_ONLINE.md#set-up-tailscale)) |
 | Anywhere else, no extra app | Over the internet (port forwarding) — *advanced* | Harder: the host changes router settings ([how](docs/PLAY_ONLINE.md#port-forwarding)) |
 
-1. **Host:** in the launcher's **Online** tab pick **Host a game**, send your
-   friend the address shown under *Your address*, and press **Host Game**.
-2. **Friend:** pick **Join a friend**, paste the host's address, and press
-   **Join Game**.
+1. **Host:** in the launcher's *Online* tab pick *Host a game*, send your
+   friend the address shown under *Your address*, and press *Host Game*.
+2. **Friend:** pick *Join a friend*, paste the host's address, and press
+   *Join Game*.
 3. **In the game, both:** ONLINE > Quick Match > Search. The host presses
-   **X (Create Game)**, and the friend lands in the host's Game Room.
+   X (Create Game), and the friend lands in the host's Game Room.
 
 ![The launcher's Online tab: Host a game over Tailscale, with the address to send to the friend](docs/images/launcher-online.png)
 
@@ -96,7 +96,7 @@ See the checklist in [Play online](docs/PLAY_ONLINE.md#cant-connect).
   matches.
 - **Settings menu in the game's own style** (RECOMP SETTINGS on the main menu,
   F4, or hold Back + Y); the launcher edits the same settings.
-- **Keyboard controls** and **controller button remapping**.
+- **Keyboard controls and controller button remapping**.
 - **Portable**: settings, saves and logs live next to the game. Saving and
   loading work.
 
@@ -109,7 +109,7 @@ See the checklist in [Play online](docs/PLAY_ONLINE.md#cant-connect).
 | F3 | | Overlay with the frame rate |
 | F7 / Backtick | | Achievements / console |
 
-You can also quit with **EXIT GAME** on the main menu.
+You can also quit with EXIT GAME on the main menu.
 
 **In the settings menu:** LB / RB (Page Up / Page Down) switch tabs, up and
 down pick a setting, left and right change it. Start (Ctrl+S) saves, Y saves
@@ -130,15 +130,16 @@ The keyboard works as player 1's controller, alongside a gamepad:
 | Right stick (click) | arrow keys (K) |
 | D-pad | Shift + arrow keys |
 
-Change the keys on the settings menu's **Keyboard** tab, and remap controller
-buttons on its **Controller** tab (e.g. swap A and B). Button remapping takes
+Change the keys on the settings menu's *Keyboard* tab, and remap controller
+buttons on its *Controller* tab (e.g. swap A and B). Button remapping takes
 effect after a restart.
 
 ## Settings
 
-The settings menu and the launcher edit `config/thebigs2.toml`. You can also
-edit the file by hand: every setting is listed in it with an explanation. The
-main ones:
+Change settings in the game, from the RECOMP SETTINGS menu (on the main menu,
+F4, or hold Back + Y), or in the launcher. Both save to `config/thebigs2.toml`.
+You can also edit the file by hand: every setting is listed in it with an
+explanation. The main ones:
 
 | Setting | Default | |
 |---|---|---|
