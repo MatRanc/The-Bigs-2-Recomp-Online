@@ -1,7 +1,7 @@
 # The Bigs 2 Online
 
 Play *The Bigs 2* (Xbox 360, 2K Sports, 2009) **online against a friend** again,
-on Windows, Linux and macOS.
+on Windows and Linux, and (experimental) macOS.
 
 Based on [The Bigs 2 Recompiled](https://github.com/mdomangue26/The-Bigs-2-Recompiled)
 by Michael (mdomangue26), a native PC port of the game. This fork brings back
@@ -22,7 +22,7 @@ and play a full match, in sync.
    |---|---|
    | Windows 10/11 (64-bit) | `TheBigs2-windows-x64.zip` |
    | Linux (and Steam Deck) | `TheBigs2-linux-x64.tar.gz` |
-   | macOS | `TheBigs2-macos-arm64.zip` *(coming soon)* |
+   | macOS (Apple Silicon) | **Experimental**, build it yourself for now ([see below](#macos-experimental)) |
 
 2. Unpack it into a folder of its own and put your `.iso` next to it.
 3. Open **The Bigs 2 Launcher** in that folder. Nothing else to install.
@@ -172,6 +172,19 @@ If the folder can't be written to, the game uses `~/.config/thebigs2` and
 **Requirements:** a GPU with Vulkan support and a current driver. Linux needs
 glibc 2.38 or newer (Ubuntu 24.04, Fedora 39, current Arch or SteamOS).
 Windows needs 64-bit Windows 10 or 11.
+
+## macOS (experimental)
+
+The game builds and runs on Apple Silicon Macs (`packaging/build-macos.sh`, see
+[docs/BUILDING.md](docs/BUILDING.md)), and **online play with a Linux PC works**:
+a Mac joined a Linux host's Game Room and played a match. Known problems:
+
+- Player models are spiked and the bat floats (graphics through MoltenVK/Metal).
+- Matches run slower than on a PC; online, both players run at the Mac's pace.
+- It defaults to 1x resolution and the "host" render path (the PC defaults
+  glitch on Metal).
+
+Fixes welcome; see [docs/ONLINE.md](docs/ONLINE.md) for the technical notes.
 
 ## Steam Deck
 

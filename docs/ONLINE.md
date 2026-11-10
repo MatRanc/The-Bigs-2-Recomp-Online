@@ -135,9 +135,22 @@ lookup, the fake Live profile and the offline stats lookup.
 
 ## Open items
 
-- First tests on Windows (zip from `packaging/build-windows.sh`) and macOS
-  (`packaging/build-macos.sh`, untested), then two real machines.
-- Mac (ARM) vs PC lockstep is unproven beyond the FMA fix.
+- Tested across machines: a Linux host and an Apple Silicon Mac (same home
+  network) met in the Game Room and played a match. Needed two macOS fixes:
+  hooks must add the 0xE0000000 host offset (`src/guest_memory.h`; Windows has
+  the same offset), and the SDK must convert socket addresses to the BSD
+  `sockaddr` layout (otherwise the UDP lockstep `connect` fails with
+  WSAEWOULDBLOCK and the match never starts). A long Mac-vs-PC match has not
+  been checked for desync yet.
+- macOS is experimental: spiked/stretched player models and a floating bat
+  (likely the Metal/MoltenVK path; the unpacked game data matches Linux), and
+  slower matches. Leads: upstream issue rexglue/rexglue-sdk#446 (a Fable II
+  port switched to XeniOS's native Metal backend).
+- Windows: built and packaged, not yet run on a Windows PC.
+- `TB2_NET_LOG=1` logs a per-second summary of the lockstep link
+  (WSASend/WSARecv); about 45 packets/s each way in a running match.
+- The host's game crash-loops (guest access violations) if a match fails to
+  start and the session times out; harmless otherwise, still to fix.
 - The game's desync path (`8237A950` ends the session) has not been seen in
   testing (two full innings so far); a long match is still worth playing.
 - `online_debug.cpp` mixes the needed hooks with debug probes; split it before
