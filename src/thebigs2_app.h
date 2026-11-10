@@ -103,6 +103,9 @@ class Thebigs2App : public rex::ReXApp {
       // Metal: no fragment shader interlock; scaling is experimental (see settings.cpp).
       set_default("render_target_path_vulkan", "host");
       set_default("resolution_scale", "1");
+      // Let Apple GPUs fuse pixel-shader math: with NoContraction every add/mul became an un-inlined call in MSL
+      // (rexglue-sdk#539/#540, ~5x faster fragment work). Pixels only, so online lockstep is unaffected.
+      set_default("spirv_pixel_shader_no_contraction", "false");
 #else
       set_default("render_target_path_vulkan", "fsi");
       set_default("resolution_scale", "2");
