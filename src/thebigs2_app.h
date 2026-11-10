@@ -99,8 +99,14 @@ class Thebigs2App : public rex::ReXApp {
       set_default("mnk_mode", "false");
       REXLOG_INFO("Steam Deck profile (TB2_PROFILE=steamdeck)");
     } else {
+#if defined(__APPLE__)
+      // Metal: no fragment shader interlock; scaling is experimental (see settings.cpp).
+      set_default("render_target_path_vulkan", "host");
+      set_default("resolution_scale", "1");
+#else
       set_default("render_target_path_vulkan", "fsi");
       set_default("resolution_scale", "2");
+#endif
       // The keyboard acts as player 1's controller (merged with the first
       // pad, so both work at once). Bindings are the keybind_* settings.
       set_default("mnk_mode", "true");

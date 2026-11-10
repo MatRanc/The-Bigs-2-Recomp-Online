@@ -303,11 +303,17 @@ std::string ConfigTemplate() {
 #else
   text.erase(gpu, 13);
 #endif
-  if (!SteamDeckProfile()) return text;
   auto set = [&text](std::string_view from, std::string_view to) {
     const size_t pos = text.find(std::string("\n") + std::string(from) + "\n");
     if (pos != std::string::npos) text.replace(pos + 1, from.size(), to);
   };
+#if defined(__APPLE__)
+  // Metal (MoltenVK) has no fragment shader interlock and resolution scaling is experimental there:
+  // host render targets at 1x, as on the Steam Deck (the fsi path glitches and crawls on a Mac).
+  set("resolution_scale = 2", "resolution_scale = 1");
+  set("render_target_path_vulkan = \"fsi\"", "render_target_path_vulkan = \"host\"");
+#endif
+  if (!SteamDeckProfile()) return text;
   set("resolution_scale = 2", "resolution_scale = 1");
   set("render_target_path_vulkan = \"fsi\"", "render_target_path_vulkan = \"host\"");
   set("anisotropic_override = 3", "anisotropic_override = -1");
