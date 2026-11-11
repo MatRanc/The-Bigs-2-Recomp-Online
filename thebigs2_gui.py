@@ -228,6 +228,55 @@ GUIDE_URL = "https://github.com/MatRanc/The-Bigs-2-Recomp-Online/blob/HEAD/docs/
 TAILSCALE_GUIDE_URL = GUIDE_URL + "#set-up-tailscale"
 HELP_URL = GUIDE_URL + "#cant-connect"
 PUBLIC_IP_URL = "https://api.ipify.org"
+RELEASES_URL = "https://github.com/MatRanc/The-Bigs-2-Recomp-Online/releases/latest"
+RELEASE_API_URL = "https://api.github.com/repos/MatRanc/The-Bigs-2-Recomp-Online/releases/latest"
+
+
+def launcher_version():
+    """The release tag this launcher was built from (written by build-launcher.yml); 'dev' from source."""
+    try:
+        with open(os.path.join(RES, "version.txt"), encoding="utf-8-sig") as fh:
+            return fh.read().strip() or "dev"
+    except (OSError, ValueError):
+        return "dev"
+
+
+def latest_release():
+    """Tag of the newest stable GitHub release, or None if it can't be fetched."""
+    request = urllib.request.Request(RELEASE_API_URL, headers={"User-Agent": "thebigs2-launcher"})
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            data = response.read()
+    except Exception:  # a bundled Python may lack CA certificates; curl uses the system's
+        try:
+            data = subprocess.run(
+                ["curl", "-fsSL", "-m", "5", RELEASE_API_URL], capture_output=True, timeout=8,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout
+        except Exception:
+            return None
+    try:
+        return str(json.loads(data)["tag_name"])
+    except Exception:
+        return None
+
+
+_VERSION = re.compile(r"v?(\d+(?:\.\d+)*)(?:-([A-Za-z]+)(?:\.(\d+))?)?$")
+
+
+def _version_key(tag):
+    m = _VERSION.fullmatch((tag or "").strip())
+    if not m:
+        return None
+    base = [int(part) for part in m.group(1).split(".")]
+    while len(base) > 1 and base[-1] == 0:  # v1.1.0 and v1.1 are the same release
+        base.pop()
+    return (tuple(base), (m.group(2) or "").lower(), int(m.group(3) or 0))
+
+
+def is_newer(tag, current):
+    """True if 'v1.1.3-online' is newer than 'v1.1.2-online.1'; False for anything that isn't a version."""
+    a, b = _version_key(tag), _version_key(current)
+    return a is not None and b is not None and a > b
 
 
 def is_tailscale_ip(ip):
@@ -740,6 +789,16 @@ class Launcher(tk.Tk):
         self._external_change = False
         self._set_window_icon()
 
+        self.version = launcher_version()
+        self._latest_release = ""
+        self._update_checked = True
+        self.update_link = None
+        # --check must stay offline (tests and CI); source checkouts have no version to compare.
+        self._update_enabled = self.version != "dev" and "--check" not in sys.argv
+        if self._update_enabled:  # one request to GitHub at start; _poll_update shows the result
+            self._update_checked = False
+            threading.Thread(target=self._fetch_latest_release, daemon=True).start()
+
         self._apply_theme()
         self._build_header()
         self._build_tabs()
@@ -747,6 +806,8 @@ class Launcher(tk.Tk):
         self.load()
         # Pick up changes the game (or a text editor) makes to the file.
         self.after(1000, self._poll_config)
+        if self._update_enabled:
+            self.after(500, self._poll_update)
 
     # -- theme -------------------------------------------------------------
     # The sv-ttk "Sun Valley" theme (as in the mlb16-online launcher), in the
@@ -1383,6 +1444,7 @@ class Launcher(tk.Tk):
         ttk.Separator(self).pack(fill="x", padx=28, pady=(6, 0))
         foot = ttk.Frame(self, padding=(28, 14, 28, 20))
         foot.pack(fill="x")
+        self._footer = foot
         self.launch_btn = ttk.Button(foot, text="Launch Game", style="Accent.TButton",
                                      command=self.launch)
         self.launch_btn.pack(side="right", padx=(10, 0))
@@ -1476,6 +1538,80 @@ class Launcher(tk.Tk):
             self._log_error(f"Config auto-reload failed: {e}")
         try:
             self.after(1000, self._poll_config)
+        except tk.TclError:
+            pass
+
+    # -- update check ------------------------------------------------------
+    def _fetch_latest_release(self):
+        # Runs on a daemon thread; _poll_update reads the result on the main loop.
+        try:
+            self._latest_release = latest_release() or ""
+        finally:
+            self._update_checked = True
+
+    def _poll_update(self):
+        try:
+            if not self.winfo_exists():
+                return
+            if not self._update_checked:
+                self.after(500, self._poll_update)
+                return
+            tag = self._latest_release
+            if tag and not self.update_link and is_newer(tag, self.version):
+                self._show_update_link(tag)
+                self._show_update_dialog(tag)
+        except tk.TclError:
+            pass
+
+    def _show_update_dialog(self, tag):
+        try:
+            if self._ask_update(tag):
+                webbrowser.open(RELEASES_URL)
+        except tk.TclError:
+            pass
+
+    def _ask_update(self, tag):
+        """Modal Yes/No update dialog, centred on the screen (Tk's messagebox centres on the window)."""
+        win = tk.Toplevel(self)
+        win.title("Update available")
+        win.transient(self)
+        win.resizable(False, False)
+        frame = ttk.Frame(win, padding=(24, 20, 24, 18))
+        frame.pack(fill="both", expand=True)
+        ttk.Label(frame, text="Update available", font=self.font_h1).pack(anchor="w")
+        ttk.Label(frame, wraplength=420, justify="left",
+                  text=f"A newer version of The Bigs 2 Launcher is available ({tag}).\n\n"
+                       f"You have {self.version}.\n\nOpen the download page?").pack(anchor="w", pady=(10, 18))
+        answer = tk.BooleanVar(value=False)
+
+        def choose(value):
+            answer.set(value)
+            win.destroy()
+
+        buttons = ttk.Frame(frame)
+        buttons.pack(fill="x")
+        ttk.Button(buttons, text="Not now", command=lambda: choose(False)).pack(side="right")
+        ttk.Button(buttons, text="Open download page", style="Accent.TButton",
+                   command=lambda: choose(True)).pack(side="right", padx=(0, 8))
+        win.bind("<Escape>", lambda _e: choose(False))
+        win.bind("<Return>", lambda _e: choose(True))
+        win.protocol("WM_DELETE_WINDOW", lambda: choose(False))
+        win.update_idletasks()
+        w, h = win.winfo_reqwidth(), win.winfo_reqheight()
+        x = max(0, (win.winfo_screenwidth() - w) // 2)
+        y = max(0, (win.winfo_screenheight() - h) // 2)
+        win.geometry(f"+{x}+{y}")  # centred on the screen, not on the launcher window
+        win.grab_set()
+        win.focus_set()
+        self.wait_window(win)
+        return answer.get()
+
+    def _show_update_link(self, tag):
+        try:
+            self.update_link = ttk.Label(self._footer, text=f"Update available: {tag}",
+                                         style="Running.TLabel", cursor="hand2")
+            self.update_link.bind("<Button-1>", lambda _e: webbrowser.open(RELEASES_URL))
+            self.update_link.pack(side="left", padx=(18, 0))
         except tk.TclError:
             pass
 

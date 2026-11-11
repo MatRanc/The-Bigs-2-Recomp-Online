@@ -33,6 +33,9 @@ and play a full match, in sync.
      right-click it > *Open*.
 4. Press *Play Offline* to try it. The first start asks for your disc image
    (an `.iso` next to the game is preselected) and copies its files once.
+   The launcher also checks GitHub for a newer release each time it opens; if
+   there is one, a popup offers the download page and an *Update available*
+   link appears in the footer.
 
 **Requirements:** a GPU with Vulkan support and a current driver. Linux needs
 glibc 2.38 or newer (Ubuntu 24.04, Fedora 39, current Arch or SteamOS).

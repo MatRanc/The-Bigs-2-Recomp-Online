@@ -25,5 +25,6 @@ research/
 xenia-netplay/
 callgraph.json
 TheBigs2Launcher.desktop
+version.txt
 tools/ghidra_scripts/
 docs/ONLINE_P2P_HANDOFF.md

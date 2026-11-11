@@ -106,12 +106,16 @@ data. The launcher apps are built by GitHub Actions
 (`.github/workflows/build-launcher.yml`, run it from the Actions tab or push a
 `v*` tag); the game can't be built there, since that needs game files.
 
+Push the release tag first: the `v*` workflow run bakes the tag into the
+launcher, which is what its update check compares against. A launcher from a
+manual run has no version and skips the check.
+
 ```bash
 packaging/fetch-launcher.sh  # download the launcher apps into out/launcher/ (gh CLI)
 packaging/build-linux.sh     # out/linux/TheBigs2-linux-x64.tar.gz (both AppImages + launcher)
 packaging/build-windows.sh   # out/windows/TheBigs2-windows-x64.zip
-packaging/build-macos.sh     # on a Mac: out/macos/TheBigs2-macos-<arch>.zip
-packaging/release.sh <tag>   # all of the above for Linux + Windows, uploaded to the release
+LAUNCHER_TAG=<tag> packaging/build-macos.sh  # on a Mac: the tag's launcher + the game
+packaging/release.sh <tag>   # downloads the tag's launchers, then uploads Linux + Windows
 ```
 
 Configure the Linux build without `-DTB2_FN_TRACE=ON` (a debug option) before

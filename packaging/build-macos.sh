@@ -62,7 +62,11 @@ cp "$BUILD/thebigs2" "$BUILD"/*.dylib "$STAGE/"
 # The stand-alone launcher app (GitHub Actions build): out/launcher/launcher-macos/, from fetch-launcher.sh (needs
 # the gh CLI) or copied over from another machine.
 LAUNCHER_ZIP="${LAUNCHER_ZIP:-$ROOT/out/launcher/launcher-macos/The Bigs 2 Launcher.app.zip}"
-if [ ! -f "$LAUNCHER_ZIP" ] && command -v gh >/dev/null; then "$ROOT/packaging/fetch-launcher.sh" || true; fi
+if [ ! -f "$LAUNCHER_ZIP" ] && command -v gh >/dev/null; then
+  # LAUNCHER_TAG=<tag> for a release: that run's launcher carries the tag for its update check.
+  if [ -n "${LAUNCHER_TAG:-}" ]; then "$ROOT/packaging/fetch-launcher.sh" --tag "$LAUNCHER_TAG" || true
+  else "$ROOT/packaging/fetch-launcher.sh" || true; fi
+fi
 [ -f "$LAUNCHER_ZIP" ] || { echo "No launcher at $LAUNCHER_ZIP: run packaging/fetch-launcher.sh (gh CLI) first." >&2; exit 1; }
 ditto -x -k "$LAUNCHER_ZIP" "$STAGE"
 (cd "$ROOT/out/macos" && rm -f "$NAME.zip" && zip -qry "$NAME.zip" "$NAME")
