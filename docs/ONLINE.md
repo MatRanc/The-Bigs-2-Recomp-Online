@@ -123,7 +123,21 @@ through `TB2_AUTOKEY` files (`/tmp/host.keys`, `/tmp/guest.keys`; lines like
 shift+arrows = d-pad). Logs are in `out/build/linux-amd64-release/logs/`.
 Two instances share one GPU, so expect ~22 fps each at resolution scale 2.
 The scripts use fixed waits and sometimes press during a screen change; check
-the screenshots.
+the screenshots. `untilmenu Return` presses Start every 2 s until the main menu
+has loaded (A does not skip the intro on Windows) and gives up after ~2.5 min,
+dropping the rest of that key file.
+
+### Windows
+
+Put `tools/run_pair.bat` and `tools/shot.ps1` next to `thebigs2.exe`.
+`run_pair.bat` starts the host, waits until `netstat -an` shows
+`:51000 ... LISTENING`, then starts the joiner; `run_pair.bat auto` also
+injects the keys (files in `%TEMP%\tb2keys`). Each window's title ends with
+its player name (`TB2_ACCOUNT_NAME`: User1 = host, User2 = joiner).
+`powershell -ExecutionPolicy Bypass -File shot.ps1 tag` saves each game window
+to `%TEMP%\tag_<pid>.png` with `PrintWindow(PW_RENDERFULLCONTENT)`, so it
+works even when a terminal covers the game. Logs are in the `logs` folder next
+to the exe.
 
 ## SDK changes
 
@@ -146,7 +160,8 @@ lookup, the fake Live profile and the offline stats lookup.
   (likely the Metal/MoltenVK path; the unpacked game data matches Linux), and
   slower matches. Leads: upstream issue rexglue/rexglue-sdk#446 (a Fable II
   port switched to XeniOS's native Metal backend).
-- Windows: built and packaged, not yet run on a Windows PC.
+- Windows: tested with two instances on one PC (1.1.2): Game Room, rejoin,
+  host and joiner leaving, a match start on a cold shader cache, quitting mid-match.
 - `TB2_NET_LOG=1` logs a per-second summary of the lockstep link
   (WSASend/WSARecv); about 45 packets/s each way in a running match.
 - Leaving is handled: either player can back out of the Game Room, quit, or

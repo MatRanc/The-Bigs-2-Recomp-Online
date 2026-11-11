@@ -172,6 +172,12 @@ class Thebigs2App : public rex::ReXApp {
 
     // Display mode from the settings file (resolution / refresh rate).
     app_context().CallInUIThreadDeferred([] { tb2::ApplyDisplaySettings(true); });
+    // Online: the player name in the title tells two instances on one PC apart (deferred: the window comes later).
+    if (const char* name = std::getenv("TB2_ACCOUNT_NAME"); name && *name) {
+      app_context().CallInUIThreadDeferred([this, name = std::string(name)] {
+        if (window()) window()->SetTitle(window()->GetTitle() + " - " + name);
+      });
+    }
     tb2::InstallDisplayWatch([this](std::function<void()> fn) {
       app_context().CallInUIThreadDeferred(std::move(fn));
     });

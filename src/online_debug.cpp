@@ -142,7 +142,6 @@ extern "C" REX_FUNC(__imp__sub_8240A5C0);
 extern "C" REX_FUNC(__imp__sub_823F81B0);
 extern "C" REX_FUNC(__imp__sub_823F82D8);
 extern "C" REX_FUNC(__imp__sub_823E9F18);
-extern "C" REX_FUNC(__imp__sub_823F4AB0);
 extern "C" REX_FUNC(__imp__sub_823F44B8);
 extern "C" REX_FUNC(__imp__sub_823ECEE0);
 extern "C" REX_FUNC(__imp__sub_82420F20);
@@ -352,8 +351,8 @@ void MaybeInjectFakeAccount(PPCContext& parent, uint8_t* base) {
 
 // Session lock (825f514c): the OP session's constructor (823F43B0) takes it, the teardown (823ED1E0) releases it
 // so the Live worker (823ED4E0) can finish, and the destructor (823F4460) releases it and clears 825f5144. The
-// host builds two sessions (TB2_FAKE_HOST's below, then the game's own on Create Game) and the first is never
-// destroyed, so its lock stayed held: the worker blocked and the host sat on "Exiting match, please wait"
+// host used to build two sessions (TB2_FAKE_HOST's Search hook, then the game's own on Create Game) and the first
+// was never destroyed, so its lock stayed held: the worker blocked and the host sat on "Exiting match, please wait"
 // forever. A session still registered at construction is such an orphan, so release its lock once.
 extern "C" REX_FUNC(__imp__sub_823F43B0);
 extern "C" REX_FUNC(__imp__sub_8240F610);
@@ -377,35 +376,10 @@ extern "C" REX_FUNC(sub_823F82D8) {
   if (!manager) return;
 
   if (std::getenv("TB2_FAKE_HOST")) {
-    uint32_t session = LoadGuestU32(base, 0x825f5144);
-    if (!session) {
-      rex::CallFrame frame(ctx);
-      frame.ctx.r3.u64 = manager;
-      frame.ctx.r4.u64 = 0;
-      frame.ctx.r5.u64 = 0;
-      __imp__sub_823F4AB0(frame.ctx, base);
-      session = frame.ctx.r3.u32;
-      if (session) {
-        StoreGuestU32(base, 0x825f5144, session);
-      }
-    }
-    // Clear search status
-    StoreGuestU32(base, manager + 0xA8, 0);
-
-    if (session) {
-      if (std::getenv("TB2_ONLINE_DEBUG")) {
-        REXLOG_INFO("OnlineDebug: TB2_FAKE_HOST: triggering host session create (session=0x{:08X}, mgr=0x{:08X})",
-                    session, manager);
-      }
-      rex::CallFrame frame(ctx);
-      frame.ctx.r3.u64 = session;
-      frame.ctx.r4.u64 = manager + 0x44;
-      frame.ctx.r5.u64 = 0;
-      __imp__sub_823F44B8(frame.ctx, base);
-      if (std::getenv("TB2_ONLINE_DEBUG")) {
-        REXLOG_INFO("OnlineDebug: TB2_FAKE_HOST: sub_823F44B8 returned 0x{:08X}", frame.ctx.r3.u32);
-      }
-    }
+    // The host's Search only reports "No Game Rooms found"; Create Game builds and binds its own session.
+    // Creating one here as well re-ran 823F44B8 on the stale post-match session on every Search and then
+    // crashed (Windows 1.1.2, null read ~2 s after the third Search).
+    StoreGuestU32(base, manager + 0xA8, 0);  // clear the search status
     return;
   }
 
@@ -455,6 +429,32 @@ extern "C" REX_FUNC(sub_822A5328) {
     }
   }
   __imp__sub_822A5328(ctx, base);
+}
+
+// 822A5060(mgr, reason) handles a Live connection-lost event: signs the user out (skipped for the synthetic account,
+// see 823F5DA0) and shows "You must be connected to Xbox LIVE". The synthetic Live raises one at every online boot
+// (event 6), so the dialog sat on the title. Before any session exists there is nothing to lose: skip it.
+extern "C" REX_FUNC(__imp__sub_822A5060);
+extern "C" REX_FUNC(sub_822A5060) {
+  if (std::getenv("TB2_FAKE_ACCOUNT") && !LoadGuestU32(base, 0x825f5144)) {
+    REXLOG_INFO("OnlineDebug: 822A5060(reason={}) without a session, Live-lost dialog skipped", ctx.r4.s32);
+    return;
+  }
+  __imp__sub_822A5060(ctx, base);
+}
+
+// 823E9EB0(user) sets the Live user index (DAT_825d4bf8). Pressing Start on the title after dismissing the first
+// "You must be connected to Xbox LIVE" dialog posts a second one; its OK runs 822BF488 -> 822A5328 -> 823E9EB0(0).
+// With user 0 set and no session, the Live code (823F12B0 here, 823F0880 on Quick Match) looks up the user's entry
+// in the *825F5148 list, which the synthetic account doesn't have, and reads guest 0. Keep the index at 4 ("no
+// user") until a session exists; sub_82289560 below sets it to 0 then.
+extern "C" REX_FUNC(__imp__sub_823E9EB0);
+extern "C" REX_FUNC(sub_823E9EB0) {
+  if (std::getenv("TB2_FAKE_ACCOUNT") && ctx.r3.s32 < 4 && !LoadGuestU32(base, 0x825f5144)) {
+    REXLOG_INFO("OnlineDebug: 823E9EB0({}) without a session, Live user index kept at 4", ctx.r3.s32);
+    ctx.r3.u64 = 4;
+  }
+  __imp__sub_823E9EB0(ctx, base);
 }
 
 // Function_822A54F0 starts the profile sign-in and posts the busy dialog.
@@ -1641,7 +1641,7 @@ void AutoKeyLoop(std::string path) {
       if (key.rfind("shift+", 0) == 0) { mod = SDL_KMOD_LSHIFT; key = key.substr(6); }
       const SDL_Scancode sc = SDL_GetScancodeFromName(key.c_str());
       if (sc == SDL_SCANCODE_UNKNOWN) { REXLOG_INFO("AutoKey: unknown key '{}'", key); continue; }
-      const auto press = [&] {
+      const auto press = [&](SDL_Scancode sc) {
         {  // the game ignores keys while its window is unfocused; two instances share one desktop
           SDL_Event f{};
           f.type = SDL_EVENT_WINDOW_FOCUS_GAINED;
@@ -1654,14 +1654,22 @@ void AutoKeyLoop(std::string path) {
         std::this_thread::sleep_for(std::chrono::milliseconds(ms));
         AutoKeyKey(sc, mod, false, wid);
         if (mod) AutoKeyKey(SDL_SCANCODE_LSHIFT, SDL_KMOD_NONE, false, wid);
-        ++g_fn_epoch; REXLOG_INFO("AutoKey: {} {}", cmd, key);
+        ++g_fn_epoch; REXLOG_INFO("AutoKey: {} {}", cmd, SDL_GetScancodeName(sc));
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
       };
-      if (cmd != "untilmenu") { press(); continue; }
-      // untilmenu <key>: press it every 2 s (skips the intro, then "press start") until the main menu loads.
-      while (!tb2::g_main_menu_loaded) {
-        press();
+      if (cmd != "untilmenu") { press(sc); continue; }
+      // untilmenu <key>: every 2 s press <key>, then space (A), in turn, until the main menu loads. Use Return
+      // (Start): on Windows A does not skip the intro, and only A closes the boot "connected to Xbox LIVE" dialog
+      // and the "No BIGS 2 profile" prompt (its default is NO). Gives up after 60 presses (~2.5 min) and drops the
+      // rest of the script, so later keys don't land on whatever screen is up instead.
+      int presses = 0;
+      while (!tb2::g_main_menu_loaded && presses < 60) {
+        press(presses++ % 2 ? SDL_SCANCODE_SPACE : sc);
         for (int i = 0; i < 20 && !tb2::g_main_menu_loaded; i++) std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      }
+      if (!tb2::g_main_menu_loaded) {
+        REXLOG_WARN("AutoKey: untilmenu gave up, main menu never loaded; rest of the script dropped");
+        break;
       }
     }
   }
