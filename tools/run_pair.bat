@@ -38,7 +38,7 @@ start "TB2 host" thebigs2.exe
 rem Keys: space=A, l=X, BackSpace=B, shift+arrows=d-pad. The menu wraps: Up once from the top is ONLINE.
 if defined AUTO (
   timeout /t 13 /nobreak >nul
-  call :send host "tap space" "wait 3000" "tap shift+Up" "wait 800" "tap space" "wait 3500" "tap space" "wait 3500" "tap space" "wait 7000" "tap l"
+  call :send host "untilmenu space" "wait 3000" "tap shift+Up" "wait 800" "tap space" "wait 3500" "tap space" "wait 3500" "tap space" "wait 7000" "tap l"
 )
 echo Waiting for the host to listen on 51000 (create the game in the host window)...
 :wait
@@ -60,7 +60,7 @@ if not defined AUTO (echo Joiner started. In its window go to online play and pr
 
 rem Same timings as tools/auto_online.sh and tools/to_match.sh.
 timeout /t 13 /nobreak >nul
-call :send guest "tap space" "wait 3000" "tap shift+Up" "wait 800" "tap space" "wait 3500" "tap space" "wait 3500" "tap space"
+call :send guest "untilmenu space" "wait 3000" "tap shift+Up" "wait 800" "tap space" "wait 3500" "tap space" "wait 3500" "tap space"
 timeout /t 24 /nobreak >nul
 echo Game Room: both Ready
 call :send guest "tap space"

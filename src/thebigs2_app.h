@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <csignal>
 #include <cstdlib>
 #include <filesystem>
 #include <thread>
@@ -52,6 +53,11 @@ class Thebigs2App : public rex::ReXApp {
   // GPU emulation is opt-in; default to the Xenos plugin unless the user
   // picked one with --gpu_plugin.
   void OnPreSetup(rex::RuntimeConfig& config) override {
+#ifndef _WIN32
+    // A send() to a peer that has gone away raises SIGPIPE, which kills the game silently when the other player
+    // quits; ignoring it makes send() return EPIPE instead, as on Windows.
+    std::signal(SIGPIPE, SIG_IGN);
+#endif
     if (config.gpu_plugin.empty()) config.gpu_plugin = "xenos";
 
     // Present with plain FIFO (vsync) by default. The SDK prefers immediate,

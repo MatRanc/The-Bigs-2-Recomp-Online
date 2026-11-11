@@ -8,10 +8,10 @@ pkill -x thebigs2; sleep 1
 DOWNS="tap shift+Up"   # menu wraps: Up once from the top reaches ONLINE
 send() { echo "$2" | tr ';' '\n' >> $K/$1.keys; }
 tools/run_pair.sh host; sleep 13
-send host "tap space;wait 3000;$DOWNS;wait 800;tap space;wait 3500;tap space;wait 3500;tap space;wait 7000;tap l"
+send host "untilmenu space;wait 3000;$DOWNS;wait 800;tap space;wait 3500;tap space;wait 3500;tap space;wait 7000;tap l"
 until ss -ltn | grep -q :51000; do sleep 1; done; sleep 4
 tools/run_pair.sh guest; sleep 13
-send guest "tap space;wait 3000;$DOWNS;wait 800;tap space;wait 3500;tap space;wait 3500;tap space"
+send guest "untilmenu space;wait 3000;$DOWNS;wait 800;tap space;wait 3500;tap space;wait 3500;tap space"
 sleep 24
 send guest "tap space"; sleep 4; send host "tap space"; sleep 16
 echo "auto_online: done (both Ready sent)"

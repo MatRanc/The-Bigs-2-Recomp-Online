@@ -237,6 +237,7 @@ extern "C" REX_FUNC(sub_8240BD00) {
     return;
   }
   std::memcpy(text, patched.data(), patched.size());
+  tb2::g_main_menu_loaded = true;
   REXLOG_INFO("Main menu: XBOX LIVE removed, RECOMP SETTINGS and EXIT GAME added");
 }
 

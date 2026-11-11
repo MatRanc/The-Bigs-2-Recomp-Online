@@ -39,6 +39,7 @@
 #include <rex/system/xmemory.h>
 
 #include "online_debug.h"
+#include "main_menu_entry.h"
 
 // Per-player identity. The SDK's UserProfile (rexglue-sdk user_profile.cpp) still uses its own B13EBABE... XUID
 // for XamUserGetXUID; nothing seen so far needs the two to match.
@@ -349,6 +350,23 @@ void MaybeInjectFakeAccount(PPCContext& parent, uint8_t* base) {
 
 }  // namespace
 
+// Session lock (825f514c): the OP session's constructor (823F43B0) takes it, the teardown (823ED1E0) releases it
+// so the Live worker (823ED4E0) can finish, and the destructor (823F4460) releases it and clears 825f5144. The
+// host builds two sessions (TB2_FAKE_HOST's below, then the game's own on Create Game) and the first is never
+// destroyed, so its lock stayed held: the worker blocked and the host sat on "Exiting match, please wait"
+// forever. A session still registered at construction is such an orphan, so release its lock once.
+extern "C" REX_FUNC(__imp__sub_823F43B0);
+extern "C" REX_FUNC(__imp__sub_8240F610);
+extern "C" REX_FUNC(sub_823F43B0) {
+  if (const uint32_t old = LoadGuestU32(base, 0x825f5144)) {
+    REXLOG_INFO("OnlineDebug: session 0x{:08X} replaced without teardown, releasing its lock", old);
+    rex::CallFrame frame(ctx);
+    frame.ctx.r3.u64 = 0x825f514c;
+    __imp__sub_8240F610(frame.ctx, base);
+  }
+  __imp__sub_823F43B0(ctx, base);
+}
+
 // Function_823F82D8 is the end of the search-start path (Function_823FA440):
 // it issues the XLive search and, if that reports success synchronously, runs
 // Function_823F81B0. Since the Live service is dead it normally fails, so
@@ -549,10 +567,21 @@ extern "C" REX_FUNC(sub_82289560) {
   // The Game Room's per-player lookups use the local Live account (FUN_823e9e90), which is
   // null while DAT_825d4bf8 is 4 = "no user". The real sign-in sets it to the user index via
   // 823E9EB0; the synthetic account never does. Once a session exists, mark user 0 signed in.
-  if (std::getenv("TB2_FAKE_ACCOUNT") && LoadGuestU32(base, 0x825f5144) != 0 &&
-      LoadGuestU32(base, 0x825d4bf8) == 4) {
-    StoreGuestU32(base, 0x825d4bf8, 0);
-    REXLOG_INFO("OnlineDebug: session exists, set Live user index (DAT_825d4bf8) 4 -> 0");
+  // Put it back once the session is destroyed: with user 0 set and no session, entering Quick Match again
+  // (823F0880) looks up an object that no longer exists and reads guest 0, so a second search/host crashed.
+  static bool set_user = false;
+  if (std::getenv("TB2_FAKE_ACCOUNT")) {
+    const bool session = LoadGuestU32(base, 0x825f5144) != 0;
+    const uint32_t user = LoadGuestU32(base, 0x825d4bf8);
+    if (session && user == 4) {
+      StoreGuestU32(base, 0x825d4bf8, 0);
+      set_user = true;
+      REXLOG_INFO("OnlineDebug: session exists, set Live user index (DAT_825d4bf8) 4 -> 0");
+    } else if (!session && set_user && user == 0) {
+      StoreGuestU32(base, 0x825d4bf8, 4);
+      set_user = false;
+      REXLOG_INFO("OnlineDebug: session gone, Live user index (DAT_825d4bf8) 0 -> 4");
+    }
   }
   if (std::getenv("TB2_UI_TRACE")) {
     static auto last = std::chrono::steady_clock::now() - std::chrono::seconds(2);
@@ -812,10 +841,11 @@ extern "C" REX_FUNC(sub_823ECEE0) {
     REXLOG_INFO("OnlineDebug: 823ECEE0 host state 1 enter: session=0x{:08X} lr=0x{:08X}",
                 ctx.r3.u32, (uint32_t)ctx.lr);
   }
+  const uint32_t session = ctx.r3.u32;  // r3 holds the return value after the call
   __imp__sub_823ECEE0(ctx, base);
   if (std::getenv("TB2_ONLINE_DEBUG")) {
     REXLOG_INFO("OnlineDebug: 823ECEE0 enqueued event 0x42 (session+152={})",
-                ctx.r3.u32 ? (uint32_t)(*GuestPtr(base, ctx.r3.u32 + 152)) : 0);
+                session ? (uint32_t)(*GuestPtr(base, session + 152)) : 0);
   }
 }
 
@@ -1237,15 +1267,29 @@ extern "C" REX_FUNC(sub_823F68E0) {
   __imp__sub_823F68E0(ctx, base);
 }
 
+// Guest backtrace: back chain at [sp], saved LR at [caller sp - 8]. Stops at the thread's stack top (PCR+0x70,
+// r13 = PCR): the outermost frame's back chain is that address, which is unmapped, so reading it crashed every
+// session teardown (guest AV at 0x70190000).
+static std::string GuestBt(PPCContext& ctx, uint8_t* base) {
+  std::string bt = fmt::format("{:08X}", (uint32_t)ctx.lr);
+  const uint32_t top = LoadGuestU32(base, ctx.r13.u32 + 0x70);
+  uint32_t sp = ctx.r1.u32;
+  for (int i = 0; i < 10; i++) {
+    const uint32_t up = LoadGuestU32(base, sp);
+    if (up <= sp || up >= top) break;
+    bt += fmt::format(" <- {:08X}", LoadGuestU32(base, up - 8));
+    sp = up;
+  }
+  return bt;
+}
+
 // XLive event enqueue: Function_823EA090(event_id) pushes onto DAT_825f50fc.
 extern "C" REX_FUNC(__imp__sub_823EA090);
 extern "C" REX_FUNC(sub_823EA090) {
   if (std::getenv("TB2_ONLINE_DEBUG")) {
     REXLOG_INFO("OnlineDebug: XLive event enqueue id=0x{:08X}", ctx.r3.u32);
     if (ctx.r3.u32 == 0x17 || ctx.r3.u32 == 0x27) {  // guest backtrace: back chain [sp], saved LR at [callerSp-8]
-      std::string bt = fmt::format("{:08X}", (uint32_t)ctx.lr);
-      uint32_t sp = ctx.r1.u32;
-      for (int i = 0; i < 10 && sp; i++) { const uint32_t up = LoadGuestU32(base, sp); if (!up) break; bt += fmt::format(" <- {:08X}", LoadGuestU32(base, up - 8)); sp = up; }
+      const std::string bt = GuestBt(ctx, base);
       REXLOG_INFO("OnlineDebug: enqueue 0x{:X} backtrace {} tickepoch={}", ctx.r3.u32, bt, (uint32_t)(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() / 400));
     }
   }
@@ -1553,7 +1597,7 @@ extern "C" REX_FUNC(sub_824B7D58) {
 
 // TB2_AUTOKEY=<file>: debug-only key injector (session 10). Wayland blocks xdotool, so a thread in the
 // game pushes SDL key events into its window. Commands, one per line, appended to the file:
-//   tap [shift+]<SDL key name>   |   hold <key> <ms>   |   wait <ms>
+//   tap [shift+]<SDL key name>   |   hold <key> <ms>   |   wait <ms>   |   untilmenu <key>
 // The file is truncated after it is read.
 namespace {
 void AutoKeyKey(SDL_Scancode sc, SDL_Keymod mod, bool down, SDL_WindowID wid) {
@@ -1589,28 +1633,36 @@ void AutoKeyLoop(std::string path) {
       std::string cmd, key;
       ls >> cmd;
       if (cmd == "wait") { int ms = 0; ls >> ms; std::this_thread::sleep_for(std::chrono::milliseconds(ms)); continue; }
-      if (cmd != "tap" && cmd != "hold") continue;
+      if (cmd != "tap" && cmd != "hold" && cmd != "untilmenu") continue;
       ls >> key;
       int ms = cmd == "hold" ? 400 : 120;
-      ls >> ms;
+      if (cmd != "untilmenu") ls >> ms;
       SDL_Keymod mod = SDL_KMOD_NONE;
       if (key.rfind("shift+", 0) == 0) { mod = SDL_KMOD_LSHIFT; key = key.substr(6); }
       const SDL_Scancode sc = SDL_GetScancodeFromName(key.c_str());
       if (sc == SDL_SCANCODE_UNKNOWN) { REXLOG_INFO("AutoKey: unknown key '{}'", key); continue; }
-      {  // the game ignores keys while its window is unfocused; two instances share one desktop
-        SDL_Event f{};
-        f.type = SDL_EVENT_WINDOW_FOCUS_GAINED;
-        f.window.windowID = wid;
-        SDL_PushEvent(&f);
-        std::this_thread::sleep_for(std::chrono::milliseconds(60));
+      const auto press = [&] {
+        {  // the game ignores keys while its window is unfocused; two instances share one desktop
+          SDL_Event f{};
+          f.type = SDL_EVENT_WINDOW_FOCUS_GAINED;
+          f.window.windowID = wid;
+          SDL_PushEvent(&f);
+          std::this_thread::sleep_for(std::chrono::milliseconds(60));
+        }
+        if (mod) AutoKeyKey(SDL_SCANCODE_LSHIFT, SDL_KMOD_LSHIFT, true, wid);
+        AutoKeyKey(sc, mod, true, wid);
+        std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+        AutoKeyKey(sc, mod, false, wid);
+        if (mod) AutoKeyKey(SDL_SCANCODE_LSHIFT, SDL_KMOD_NONE, false, wid);
+        ++g_fn_epoch; REXLOG_INFO("AutoKey: {} {}", cmd, key);
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+      };
+      if (cmd != "untilmenu") { press(); continue; }
+      // untilmenu <key>: press it every 2 s (skips the intro, then "press start") until the main menu loads.
+      while (!tb2::g_main_menu_loaded) {
+        press();
+        for (int i = 0; i < 20 && !tb2::g_main_menu_loaded; i++) std::this_thread::sleep_for(std::chrono::milliseconds(100));
       }
-      if (mod) AutoKeyKey(SDL_SCANCODE_LSHIFT, SDL_KMOD_LSHIFT, true, wid);
-      AutoKeyKey(sc, mod, true, wid);
-      std::this_thread::sleep_for(std::chrono::milliseconds(ms));
-      AutoKeyKey(sc, mod, false, wid);
-      if (mod) AutoKeyKey(SDL_SCANCODE_LSHIFT, SDL_KMOD_NONE, false, wid);
-      ++g_fn_epoch; REXLOG_INFO("AutoKey: {} {}", cmd, key);
-      std::this_thread::sleep_for(std::chrono::milliseconds(250));
     }
   }
 }
@@ -1719,12 +1771,6 @@ extern "C" REX_FUNC(sub_823795E0) {
 }
 
 // Probe: who tears the session down (82378B00 / 82376CB0(reason in r4))? Logs a guest backtrace.
-static std::string GuestBt(PPCContext& ctx, uint8_t* base) {
-  std::string bt = fmt::format("{:08X}", (uint32_t)ctx.lr);
-  uint32_t sp = ctx.r1.u32;
-  for (int i = 0; i < 10 && sp; i++) { const uint32_t up = LoadGuestU32(base, sp); if (!up) break; bt += fmt::format(" <- {:08X}", LoadGuestU32(base, up - 8)); sp = up; }
-  return bt;
-}
 extern "C" REX_FUNC(__imp__sub_82378B00);
 extern "C" REX_FUNC(sub_82378B00) { REXLOG_INFO("Teardown 82378B00 bt {}", GuestBt(ctx, base)); __imp__sub_82378B00(ctx, base); }
 extern "C" REX_FUNC(__imp__sub_82376CB0);

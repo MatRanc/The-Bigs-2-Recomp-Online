@@ -149,8 +149,12 @@ lookup, the fake Live profile and the offline stats lookup.
 - Windows: built and packaged, not yet run on a Windows PC.
 - `TB2_NET_LOG=1` logs a per-second summary of the lockstep link
   (WSASend/WSARecv); about 45 packets/s each way in a running match.
-- The host's game crash-loops (guest access violations) if a match fails to
-  start and the session times out; harmless otherwise, still to fix.
+- Leaving is handled: either player can back out of the Game Room, quit, or
+  drop mid-match; the other gets the game's own "Opponent has exited" /
+  "Connection lost" message, and both can host or join again without
+  restarting. (Fixed in 1.1.2: a debug backtrace read past the stack top at
+  every session end, the host's orphaned session lock left it on "Exiting
+  match", and the Live user index stayed set after the session was gone.)
 - The game's desync path (`8237A950` ends the session) has not been seen in
   testing (two full innings so far); a long match is still worth playing.
 - `online_debug.cpp` mixes the needed hooks with debug probes; split it before
