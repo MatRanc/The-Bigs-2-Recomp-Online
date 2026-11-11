@@ -43,6 +43,9 @@ endif()
 
 if(WIN32)
     add_executable(thebigs2 WIN32 ${THEBIGS2_SOURCES} packaging/windows/thebigs2.rc)
+    # The resource compiler doesn't report the .ico it embeds, so a new icon wouldn't rebuild the .rc on its own.
+    set_source_files_properties(packaging/windows/thebigs2.rc PROPERTIES
+        OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/thebigs2.ico)
     target_link_libraries(thebigs2 PRIVATE ws2_32)  # online_debug.cpp: own-IP check for the GameConn port swap
 else()
     add_executable(thebigs2 ${THEBIGS2_SOURCES})

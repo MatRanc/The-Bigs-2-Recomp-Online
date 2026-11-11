@@ -1,2 +1,2 @@
-// Executable icon (packaging/thebigs2.svg).
+// Executable icon (the game logo, from assets/thebigs2-icon.png).
 IDI_ICON1 ICON "thebigs2.ico"
